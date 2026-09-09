@@ -1,25 +1,34 @@
 {
   "expo": {
-    "name": "tathirquran-app",
-    "slug": "tathirquran-app",
+    "name": "TathirQuran",
+    "slug": "tathirquran",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "backgroundColor": "#faf5e9",
+    "splash": {
+      "backgroundColor": "#1a1005",
+      "resizeMode": "contain"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.fivesllc.tathirquran",
+      "infoPlist": {
+        "NSUserNotificationsUsageDescription": "TathirQuran sends a daily Quran verse notification"
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#1a1005"
       },
-      "predictiveBackGestureEnabled": false
+      "package": "com.fivesllc.tathirquran",
+      "permissions": ["RECEIVE_BOOT_COMPLETED", "VIBRATE"]
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
+    "plugins": ["expo-router", "expo-font"],
+    "scheme": "tathirquran",
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }
