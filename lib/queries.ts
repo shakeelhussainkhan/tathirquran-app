@@ -49,6 +49,16 @@ export async function getLiveLanguages() {
   return data || [];
 }
 
+export async function getAllTafsirForAyah(ayahId: number, languageCode: string = 'en') {
+  const { data } = await supabase
+    .from('tafsir')
+    .select('*')
+    .eq('ayah_id', ayahId)
+    .eq('language_code', languageCode)
+    .order('scholar');
+  return data || [];
+}
+
 export async function getRecentSchedule(limit = 30) {
   const { data } = await supabase
     .from('daily_schedule')

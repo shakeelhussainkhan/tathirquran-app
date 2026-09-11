@@ -1,16 +1,30 @@
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useState } from 'react';
-import { getTodayAyah, getDefaultTranslation, getLiveLanguages } from '../lib/queries';
+import { getTodayAyah, getDefaultTranslation, getLiveLanguages, getAllTafsirForAyah } from '../lib/queries';
 import { Colors } from '../constants/colors';
 import { gregorianToHijri } from '../lib/utils';
+
+const SCHOLAR_CONFIG: Record<string, { label: string; sublabel: string }> = {
+  "Allamah Tabataba'i": {
+    label: 'Al-Mizan',
+    sublabel: "Allamah Tabataba'i (RA)",
+  },
+  'Ahlul Bayt (AS)': {
+    label: 'From the Ahlul Bayt (AS)',
+    sublabel: 'Tafsir al-Burhan — Narrations of the Imams',
+  },
+};
+
+const SCHOLAR_ORDER = ["Allamah Tabataba'i", 'Ahlul Bayt (AS)'];
 
 export default function HomeScreen() {
   const [ayah, setAyah] = useState<any>(null);
   const [translation, setTranslation] = useState<any>(null);
   const [languages, setLanguages] = useState<any[]>([]);
   const [selectedLang, setSelectedLang] = useState('en');
-  const [tafsirOpen, setTafsirOpen] = useState(false);
+  const [tafsirEntries, setTafsirEntries] = useState<any[]>([]);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,9 +34,13 @@ export default function HomeScreen() {
         getLiveLanguages(),
       ]);
       if (todayAyah) {
-        const trans = await getDefaultTranslation(todayAyah.ayah_id, 'en');
+        const [trans, tafsir] = await Promise.all([
+          getDefaultTranslation(todayAyah.ayah_id, 'en'),
+          getAllTafsirForAyah(todayAyah.ayah_id, 'en'),
+        ]);
         setAyah(todayAyah);
         setTranslation(trans);
+        setTafsirEntries(tafsir);
       }
       setLanguages(langs);
       setLoading(false);
@@ -38,6 +56,10 @@ export default function HomeScreen() {
     }
   };
 
+  const toggleSection = (scholar: string) => {
+    setOpenSections((prev) => ({ ...prev, [scholar]: !prev[scholar] }));
+  };
+
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -48,6 +70,17 @@ export default function HomeScreen() {
 
   const today = new Date();
   const hijri = gregorianToHijri(today);
+
+  // Group tafsir by scholar
+  const grouped: Record<string, any[]> = {};
+  tafsirEntries.forEach((t) => {
+    if (!grouped[t.scholar]) grouped[t.scholar] = [];
+    grouped[t.scholar].push(t);
+  });
+  const scholars = [
+    ...SCHOLAR_ORDER.filter((s) => grouped[s]),
+    ...Object.keys(grouped).filter((s) => !SCHOLAR_ORDER.includes(s)),
+  ];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -109,14 +142,53 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Tafsir toggle */}
-        <TouchableOpacity style={styles.tafsirBtn} onPress={() => setTafsirOpen(!tafsirOpen)}>
-          <Text style={styles.tafsirBtnText}>{tafsirOpen ? 'HIDE TAFSIR ↑' : 'READ TAFSIR ↓'}</Text>
-        </TouchableOpacity>
-        {tafsirOpen && (
-          <Text style={styles.tafsirText}>
-            Tafsir will be added as the collection grows. May Allah reward the scholars.
-          </Text>
+        {/* Tafsir — multi-section collapsible */}
+        {scholars.length === 0 ? (
+          <View style={styles.tafsirBtn}>
+            <Text style={[styles.tafsirBtnText, { opacity: 0.5 }]}>TAFSIR BEING ADDED</Text>
+          </View>
+        ) : (
+          <View style={styles.tafsirContainer}>
+            {scholars.map((scholar) => {
+              const config = SCHOLAR_CONFIG[scholar];
+              const entries = grouped[scholar];
+              const isOpen = openSections[scholar];
+              return (
+                <View key={scholar} style={{ marginBottom: 6 }}>
+                  <TouchableOpacity
+                    style={styles.tafsirBtn}
+                    onPress={() => toggleSection(scholar)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.tafsirBtnText}>
+                        {config?.label || scholar}
+                      </Text>
+                      {config?.sublabel && (
+                        <Text style={styles.tafsirBtnSublabel}>
+                          {config.sublabel}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={styles.tafsirChevron}>{isOpen ? '↑' : '↓'}</Text>
+                  </TouchableOpacity>
+
+                  {isOpen && (
+                    <View style={styles.tafsirBody}>
+                      {entries.map((entry, i) => (
+                        <View key={entry.id}>
+                          <Text style={styles.tafsirText}>{entry.text}</Text>
+                          <Text style={[styles.tafsirSource, i < entries.length - 1 && { marginBottom: 14 }]}>
+                            — {entry.source_book}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
         )}
 
         <View style={{ height: 40 }} />
@@ -241,13 +313,15 @@ const styles = StyleSheet.create({
   },
   pillTextActive: { color: '#fff', fontSize: 9, letterSpacing: 1 },
   pillTextInactive: { color: Colors.inkSoft, fontSize: 9, letterSpacing: 1 },
+  tafsirContainer: { width: '100%' },
   tafsirBtn: {
     borderWidth: 0.5,
     borderColor: Colors.bronzeFaded,
     paddingVertical: 8,
-    paddingHorizontal: 20,
+    paddingHorizontal: 14,
     borderRadius: 2,
-    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
     width: '100%',
   },
   tafsirBtnText: {
@@ -256,13 +330,40 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     color: Colors.bronze,
   },
+  tafsirBtnSublabel: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 8,
+    color: 'rgba(139,101,32,0.55)',
+    marginTop: 2,
+    letterSpacing: 0.5,
+  },
+  tafsirChevron: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 10,
+    color: Colors.bronze,
+    marginLeft: 8,
+  },
+  tafsirBody: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(201,162,39,0.04)',
+    borderLeftWidth: 2,
+    borderLeftColor: 'rgba(201,162,39,0.3)',
+    marginTop: 2,
+  },
   tafsirText: {
     fontFamily: 'Amiri_400Regular',
     fontSize: 14,
     fontStyle: 'italic',
     color: Colors.inkMid,
     lineHeight: 22,
-    textAlign: 'center',
-    marginTop: 8,
+    marginBottom: 8,
+  },
+  tafsirSource: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 9,
+    color: Colors.inkSoft,
+    letterSpacing: 0.5,
+    marginBottom: 4,
   },
 });
