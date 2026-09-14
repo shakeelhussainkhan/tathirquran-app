@@ -1,7 +1,6 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useState, useRef } from 'react';
-import { Audio } from 'expo-av';
+import { useEffect, useState } from 'react';
 import { getTodayAyah, getDefaultTranslation, getLiveLanguages, getAllTafsirForAyah } from '../lib/queries';
 import { Colors } from '../constants/colors';
 import { gregorianToHijri } from '../lib/utils';
@@ -27,8 +26,6 @@ export default function HomeScreen() {
   const [tafsirEntries, setTafsirEntries] = useState<any[]>([]);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
-  const [playing, setPlaying] = useState(false);
-  const soundRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -63,27 +60,11 @@ export default function HomeScreen() {
     setOpenSections((prev) => ({ ...prev, [scholar]: !prev[scholar] }));
   };
 
-  const toggleAudio = async () => {
-    if (playing) {
-      await soundRef.current?.stopAsync();
-      await soundRef.current?.unloadAsync();
-      soundRef.current = null;
-      setPlaying(false);
-      return;
-    }
-    if (!ayah) return;
-    const surahStr = String(ayah.surah_number).padStart(3, '0');
-    const ayahStr = String(ayah.ayah_number).padStart(3, '0');
+  const handleAudio = () => {
+    const surahStr = String(ayah?.surah_number || 1).padStart(3, '0');
+    const ayahStr = String(ayah?.ayah_number || 1).padStart(3, '0');
     const url = `https://everyayah.com/data/Husary_128kbps/${surahStr}${ayahStr}.mp3`;
-    const { sound } = await Audio.Sound.createAsync({ uri: url }, { shouldPlay: true });
-    soundRef.current = sound;
-    setPlaying(true);
-    sound.setOnPlaybackStatusUpdate((status) => {
-      if (status.isLoaded && status.didJustFinish) {
-        soundRef.current = null;
-        setPlaying(false);
-      }
-    });
+    Linking.openURL(url);
   };
 
   if (loading) {
@@ -149,8 +130,8 @@ export default function HomeScreen() {
         </Text>
 
         {/* Audio player */}
-        <TouchableOpacity style={styles.playBtn} onPress={toggleAudio} activeOpacity={0.7}>
-          <Text style={styles.playBtnText}>{playing ? '⏸ PAUSE' : '▶ LISTEN'}</Text>
+        <TouchableOpacity style={styles.playBtn} onPress={handleAudio} activeOpacity={0.7}>
+          <Text style={styles.playBtnText}>▶ LISTEN</Text>
         </TouchableOpacity>
 
         {/* Language pills */}
