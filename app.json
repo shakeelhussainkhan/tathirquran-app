@@ -8,27 +8,47 @@
     "userInterfaceStyle": "light",
     "backgroundColor": "#faf5e9",
     "splash": {
-      "backgroundColor": "#1a1005",
-      "resizeMode": "contain"
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#faf5e9"
     },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.fivesllc.tathirquran",
+      "buildNumber": "1",
       "infoPlist": {
-        "NSUserNotificationsUsageDescription": "TathirQuran sends a daily Quran verse notification"
+        "NSUserNotificationsUsageDescription": "TathirQuran sends a daily Quran verse notification",
+        "NSMicrophoneUsageDescription": "This app does not use the microphone.",
+        "NSCameraUsageDescription": "This app does not use the camera.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#1a1005"
-      },
       "package": "com.fivesllc.tathirquran",
-      "permissions": ["RECEIVE_BOOT_COMPLETED", "VIBRATE"]
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#faf5e9"
+      },
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
     },
-    "plugins": ["expo-router", "expo-font"],
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
     "scheme": "tathirquran",
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a55110f4-4f77-4e70-bfd2-a9a40e13328e"
+      }
+    },
+    "owner": "shakeelhussain"
   }
 }
