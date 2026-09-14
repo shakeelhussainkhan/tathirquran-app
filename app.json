@@ -47,7 +47,9 @@
       "router": {},
       "eas": {
         "projectId": "a55110f4-4f77-4e70-bfd2-a9a40e13328e"
-      }
+      },
+      "iosAppStoreUrl": "https://apps.apple.com/app/tathirquran/id6811745113",
+      "androidPlayStoreUrl": "https://play.google.com/store/apps/details?id=com.fivesllc.tathirquran"
     },
     "owner": "shakeelhussain"
   }

@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useState } from 'react';
 import { getTodayAyah, getDefaultTranslation, getLiveLanguages, getAllTafsirForAyah } from '../lib/queries';
@@ -58,6 +58,13 @@ export default function HomeScreen() {
 
   const toggleSection = (scholar: string) => {
     setOpenSections((prev) => ({ ...prev, [scholar]: !prev[scholar] }));
+  };
+
+  const handleShare = async () => {
+    const surahName = ayah?.surahs?.name_english || 'Quran';
+    const ref = `${surahName} ${ayah?.surah_number}:${ayah?.ayah_number}`;
+    const text = `"${translation?.text}"\n— ${ref}\n\nTathirQuran · tathirquran.com`;
+    await Share.share({ message: text });
   };
 
   const handleAudio = () => {
@@ -129,10 +136,15 @@ export default function HomeScreen() {
           {translation?.translations?.scholar_name}
         </Text>
 
-        {/* Audio player */}
-        <TouchableOpacity style={styles.playBtn} onPress={handleAudio} activeOpacity={0.7}>
-          <Text style={styles.playBtnText}>▶ LISTEN</Text>
-        </TouchableOpacity>
+        {/* Audio + Share row */}
+        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 8, marginBottom: 20 }}>
+          <TouchableOpacity style={styles.playBtn} onPress={handleAudio} activeOpacity={0.7}>
+            <Text style={styles.playBtnText}>▶ LISTEN</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.playBtn} onPress={handleShare} activeOpacity={0.7}>
+            <Text style={styles.playBtnText}>↑ SHARE</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Language pills */}
         <View style={styles.langSection}>
