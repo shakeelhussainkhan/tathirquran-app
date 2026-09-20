@@ -1,7 +1,7 @@
 {
   "name": "tathirquran-app",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "dependencies": {
     "@expo-google-fonts/amiri": "^0.4.1",
     "@expo/vector-icons": "^15.1.1",
