@@ -128,7 +128,16 @@ const withTathirQuranWidget = (config) => {
       fs.writeFileSync(path.join(widgetDir, 'Info.plist'), INFO_PLIST);
       console.log(`[withTathirQuranWidget] Copied widget sources to ${widgetDir}`);
 
-      // 2. Add widget target to Xcode project via xcodeproj gem
+      // 2. Write custom Gymfile so EAS uses it instead of generating its own
+      const gymfilePath = path.join(iosDir, 'Gymfile');
+      if (!fs.existsSync(gymfilePath)) {
+        fs.writeFileSync(gymfilePath, GYMFILE_CONTENT);
+        console.log(`[withTathirQuranWidget] Wrote custom Gymfile to ${gymfilePath}`);
+      } else {
+        console.log(`[withTathirQuranWidget] Gymfile already exists, skipping`);
+      }
+
+      // 3. Add widget target to Xcode project via xcodeproj gem
       const scriptPath = path.join(iosDir, '..', '.add_widget_target.rb');
       fs.writeFileSync(scriptPath, buildRubyScript(iosDir));
 
@@ -144,5 +153,39 @@ const withTathirQuranWidget = (config) => {
     },
   ]);
 };
+
+// Gymfile content: dynamically finds the EAS keychain at gym-run time
+// and enables -allowProvisioningUpdates so Xcode can auto-create
+// the com.fivesllc.tathirquran.widget App ID + distribution profile.
+const GYMFILE_CONTENT = `suppress_xcode_output(true)
+clean(false)
+
+scheme("TathirQuran")
+configuration("Release")
+
+# Find EAS keychain created during PREPARE_CREDENTIALS phase
+eas_keychain = \`security list-keychains -d user 2>/dev/null\`
+  .split("\\n")
+  .map { |p| p.strip.gsub('"', '') }
+  .find { |p| p =~ /eas-build/ }
+
+export_options({
+  method: "app-store-connect",
+  teamID: "6RB9365RBK",
+  signingStyle: "automatic",
+  provisioningProfiles: {}
+})
+
+keychain_arg = eas_keychain ? "--keychain #{eas_keychain}" : ""
+xcargs "OTHER_CODE_SIGN_FLAGS=\\"#{keychain_arg}\\" -allowProvisioningUpdates"
+export_xcargs "OTHER_CODE_SIGN_FLAGS=\\"#{keychain_arg}\\" -allowProvisioningUpdates"
+
+disable_xcpretty(true)
+buildlog_path("./build")
+derived_data_path("./build")
+result_bundle(true)
+result_bundle_path("/tmp/result-bundle-#{Time.now.to_i}.xcresult")
+output_directory("./build")
+`;
 
 module.exports = withTathirQuranWidget;
