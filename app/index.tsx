@@ -1,6 +1,7 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, Share } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { Audio } from 'expo-av';
 import { getTodayAyah, getDefaultTranslation, getLiveLanguages, getAllTafsirForAyah } from '../lib/queries';
 import { Colors } from '../constants/colors';
 import { gregorianToHijri } from '../lib/utils';
@@ -26,6 +27,9 @@ export default function HomeScreen() {
   const [tafsirEntries, setTafsirEntries] = useState<any[]>([]);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -67,12 +71,42 @@ export default function HomeScreen() {
     await Share.share({ message: text });
   };
 
-  const handleAudio = () => {
-    const surahStr = String(ayah?.surah_number || 1).padStart(3, '0');
-    const ayahStr = String(ayah?.ayah_number || 1).padStart(3, '0');
-    const url = `https://everyayah.com/data/Husary_128kbps/${surahStr}${ayahStr}.mp3`;
-    Linking.openURL(url);
+  const toggleAudio = async () => {
+    try {
+      if (playing && soundRef.current) {
+        await soundRef.current.pauseAsync();
+        setPlaying(false);
+        return;
+      }
+      if (soundRef.current) {
+        await soundRef.current.playAsync();
+        setPlaying(true);
+        return;
+      }
+      setAudioLoading(true);
+      const surahStr = String(ayah?.surah_number || 1).padStart(3, '0');
+      const ayahStr = String(ayah?.ayah_number || 1).padStart(3, '0');
+      const url = `https://everyayah.com/data/Husary_128kbps/${surahStr}${ayahStr}.mp3`;
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false });
+      const { sound } = await Audio.Sound.createAsync({ uri: url }, { shouldPlay: true });
+      soundRef.current = sound;
+      setPlaying(true);
+      setAudioLoading(false);
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          setPlaying(false);
+          soundRef.current = null;
+        }
+      });
+    } catch (e) {
+      console.error('Audio error:', e);
+      setAudioLoading(false);
+    }
   };
+
+  useEffect(() => {
+    return () => { soundRef.current?.unloadAsync(); };
+  }, []);
 
   if (loading) {
     return (
@@ -138,8 +172,8 @@ export default function HomeScreen() {
 
         {/* Audio + Share row */}
         <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 8, marginBottom: 20 }}>
-          <TouchableOpacity style={styles.playBtn} onPress={handleAudio} activeOpacity={0.7}>
-            <Text style={styles.playBtnText}>▶ LISTEN</Text>
+          <TouchableOpacity style={styles.playBtn} onPress={toggleAudio} activeOpacity={0.7}>
+            <Text style={styles.playBtnText}>{audioLoading ? 'LOADING...' : playing ? '⏸ PAUSE' : '▶ LISTEN'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.playBtn} onPress={handleShare} activeOpacity={0.7}>
             <Text style={styles.playBtnText}>↑ SHARE</Text>
@@ -248,7 +282,7 @@ const styles = StyleSheet.create({
   headerDate: {
     fontFamily: 'Amiri_400Regular',
     fontSize: 11,
-    color: Colors.inkSoft,
+    color: '#9a7830',
     letterSpacing: 0.5,
   },
   scroll: {
@@ -291,8 +325,9 @@ const styles = StyleSheet.create({
   translation: {
     fontFamily: 'Amiri_400Regular',
     fontSize: 20,
+    fontWeight: '500',
     fontStyle: 'italic',
-    color: Colors.inkMid,
+    color: '#1a1205',
     textAlign: 'center',
     lineHeight: 32,
     marginBottom: 12,
@@ -300,16 +335,16 @@ const styles = StyleSheet.create({
   },
   ref: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
+    fontSize: 12,
     letterSpacing: 2,
-    color: Colors.bronze,
+    color: '#c9a227',
     textAlign: 'center',
     marginBottom: 4,
   },
   scholar: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
-    color: Colors.inkSoft,
+    fontSize: 13,
+    color: '#8b6520',
     textAlign: 'center',
     marginBottom: 24,
   },
@@ -326,9 +361,9 @@ const styles = StyleSheet.create({
   langSection: { width: '100%', marginBottom: 16 },
   langLabel: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 8,
+    fontSize: 10,
     letterSpacing: 2,
-    color: Colors.inkSoft,
+    color: '#8b6520',
     marginBottom: 8,
   },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
@@ -340,14 +375,14 @@ const styles = StyleSheet.create({
   },
   pillInactive: {
     borderWidth: 0.5,
-    borderColor: Colors.bronzeFaded,
+    borderColor: 'rgba(139,101,32,0.4)',
     paddingVertical: 5,
     paddingHorizontal: 14,
     borderRadius: 2,
   },
   pillTextActive: { color: '#fff', fontSize: 9, letterSpacing: 1 },
-  pillTextInactive: { color: Colors.inkSoft, fontSize: 9, letterSpacing: 1 },
-  tafsirContainer: { width: '100%' },
+  pillTextInactive: { color: '#5a3a10', fontSize: 9, letterSpacing: 1 },
+  tafsirContainer: { width: '100%', marginTop: 8, gap: 8 },
   tafsirBtn: {
     borderWidth: 0.5,
     borderColor: Colors.bronzeFaded,
@@ -360,7 +395,7 @@ const styles = StyleSheet.create({
   },
   tafsirBtnText: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 9,
+    fontSize: 10,
     letterSpacing: 2,
     color: Colors.bronze,
   },
@@ -387,16 +422,16 @@ const styles = StyleSheet.create({
   },
   tafsirText: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 14,
+    fontSize: 15,
     fontStyle: 'italic',
-    color: Colors.inkMid,
-    lineHeight: 22,
+    color: '#2a1f08',
+    lineHeight: 24,
     marginBottom: 8,
   },
   tafsirSource: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 9,
-    color: Colors.inkSoft,
+    fontSize: 11,
+    color: '#9a7830',
     letterSpacing: 0.5,
     marginBottom: 4,
   },

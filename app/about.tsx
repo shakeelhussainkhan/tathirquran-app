@@ -36,6 +36,21 @@ export default function AboutScreen() {
           The name Tathir (تطهير) means purification — from the Ayah of Purification (33:33), the spiritual foundation of this app.
         </Text>
 
+        {/* Surah Al-Fatiha request */}
+        <View style={styles.fatihaSection}>
+          <Text style={styles.fatihaTitle}>A HUMBLE REQUEST</Text>
+          <Text style={styles.fatihaText}>
+            We humbly request you to recite Surah Al-Fatiha for our parents,
+            grandparents, and all Muslims, Momineen and Mominaats who have
+            passed from this world. May Allah (SWT) grant them the highest
+            stations in Jannah, alongside the Holy Prophet (SAWW) and his
+            blessed Ahlul Bayt (AS). Ameen.
+          </Text>
+          <Text style={styles.fatihaArabic}>
+            اَللّٰهُمَّ اغْفِرْ لِلْمُؤْمِنِيْنَ وَالْمُؤْمِنَاتِ
+          </Text>
+        </View>
+
         <View style={styles.divider} />
 
         {/* Scholars table */}
@@ -104,4 +119,22 @@ const styles = StyleSheet.create({
   sub: { fontFamily: 'Amiri_400Regular', fontSize: 12, color: Colors.inkSoft, marginBottom: 12 },
   email: { fontFamily: 'Amiri_400Regular', fontSize: 14, color: Colors.bronze, letterSpacing: 0.5 },
   version: { fontFamily: 'Amiri_400Regular', fontSize: 11, color: Colors.inkSoft, textAlign: 'center', marginTop: 4 },
+  fatihaSection: {
+    marginVertical: 24, padding: 16,
+    borderTopWidth: 0.5, borderBottomWidth: 0.5,
+    borderColor: 'rgba(201,162,39,0.25)',
+    backgroundColor: 'rgba(201,162,39,0.04)',
+  },
+  fatihaTitle: {
+    fontFamily: 'Amiri_400Regular', fontSize: 10,
+    letterSpacing: 3, color: '#c9a227', marginBottom: 12, textAlign: 'center',
+  },
+  fatihaText: {
+    fontFamily: 'Amiri_400Regular', fontSize: 15,
+    color: '#2a1f08', lineHeight: 26, textAlign: 'center', fontStyle: 'italic',
+  },
+  fatihaArabic: {
+    fontFamily: 'Amiri_700Bold', fontSize: 18,
+    color: '#8b6520', textAlign: 'center', marginTop: 12,
+  },
 });
