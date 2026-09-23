@@ -5,7 +5,7 @@
   "dependencies": {
     "@expo-google-fonts/amiri": "^0.4.1",
     "@expo/vector-icons": "^15.1.1",
-    "@react-native-async-storage/async-storage": "^3.1.1",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.116.0",
     "adhan": "^4.4.6",
     "expo": "~57.0.22",
