@@ -6,6 +6,7 @@
     "@expo-google-fonts/amiri": "^0.4.1",
     "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "^3.1.1",
+    "@react-native/metro-config": "^0.87.1",
     "@supabase/supabase-js": "^2.116.0",
     "adhan": "^4.4.6",
     "expo": "~57.0.22",
@@ -23,10 +24,13 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-gesture-handler": "^3.3.0",
+    "react-native-reanimated": "^4.7.0",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-url-polyfill": "^4.0.0",
-    "react-native-web": "^0.21.2"
+    "react-native-web": "^0.21.2",
+    "react-native-worklets": "^0.13.0"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
