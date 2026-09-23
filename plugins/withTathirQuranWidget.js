@@ -128,7 +128,15 @@ const withTathirQuranWidget = (config) => {
       fs.writeFileSync(path.join(widgetDir, 'Info.plist'), INFO_PLIST);
       console.log(`[withTathirQuranWidget] Copied widget sources to ${widgetDir}`);
 
-      // 2. Write custom Gymfile so EAS uses it instead of generating its own
+      // 2a. Write ASC API key to /tmp for xcodebuild -authenticationKeyPath
+      const ascKeyPath = '/tmp/asc_api_key_tathirquran.p8';
+      const ascKeyP8 = process.env.EXPO_ASC_KEY_P8;
+      if (ascKeyP8 && !fs.existsSync(ascKeyPath)) {
+        fs.writeFileSync(ascKeyPath, ascKeyP8);
+        console.log(`[withTathirQuranWidget] Wrote ASC API key to ${ascKeyPath}`);
+      }
+
+      // 2b. Write custom Gymfile so EAS uses it instead of generating its own
       const gymfilePath = path.join(iosDir, 'Gymfile');
       if (!fs.existsSync(gymfilePath)) {
         fs.writeFileSync(gymfilePath, GYMFILE_CONTENT);
@@ -176,15 +184,19 @@ export_options({
   provisioningProfiles: {}
 })
 
-# Archive phase: no --keychain restriction so Xcode can use the user's
-# Apple ID (system login keychain) for -allowProvisioningUpdates to
-# auto-create the com.fivesllc.tathirquran.widget App ID + profile.
-# The EAS keychain is already in the search list via create_keychain.
-xcargs "-allowProvisioningUpdates"
+# ASC API key for xcodebuild authentication — lets -allowProvisioningUpdates
+# automatically create the com.fivesllc.tathirquran.widget App ID + profile.
+# Key is written to /tmp by the config plugin from EXPO_ASC_KEY_P8 env var.
+asc_key_path = "/tmp/asc_api_key_tathirquran.p8"
+asc_key_id   = "58PZW5VBHA"
+asc_issuer   = "0f79a4f1-b5ba-46fc-bfa9-2bf90d144535"
+auth_flags = File.exist?(asc_key_path) ?
+  "-authenticationKeyPath #{asc_key_path} -authenticationKeyID #{asc_key_id} -authenticationKeyIssuerID #{asc_issuer}" : ""
 
-# Export phase: explicitly point to the EAS keychain + allow updates
+xcargs "-allowProvisioningUpdates #{auth_flags}"
+
 keychain_arg = eas_keychain ? "--keychain #{eas_keychain}" : ""
-export_xcargs "OTHER_CODE_SIGN_FLAGS=\\"#{keychain_arg}\\" -allowProvisioningUpdates"
+export_xcargs "OTHER_CODE_SIGN_FLAGS=\\"#{keychain_arg}\\" -allowProvisioningUpdates #{auth_flags}"
 
 disable_xcpretty(true)
 buildlog_path("./build")
