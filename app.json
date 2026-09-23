@@ -7,11 +7,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "backgroundColor": "#faf5e9",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#faf5e9"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.fivesllc.tathirquran",
@@ -38,7 +33,13 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "./plugins/withTathirQuranWidget"
+      "./plugins/withTathirQuranWidget",
+      "expo-asset",
+      ["expo-splash-screen", {
+        "backgroundColor": "#faf5e9",
+        "image": "./assets/splash.png",
+        "resizeMode": "contain"
+      }]
     ],
     "scheme": "tathirquran",
     "experiments": {
