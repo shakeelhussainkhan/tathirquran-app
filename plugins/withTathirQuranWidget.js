@@ -176,8 +176,14 @@ export_options({
   provisioningProfiles: {}
 })
 
+# Archive phase: no --keychain restriction so Xcode can use the user's
+# Apple ID (system login keychain) for -allowProvisioningUpdates to
+# auto-create the com.fivesllc.tathirquran.widget App ID + profile.
+# The EAS keychain is already in the search list via create_keychain.
+xcargs "-allowProvisioningUpdates"
+
+# Export phase: explicitly point to the EAS keychain + allow updates
 keychain_arg = eas_keychain ? "--keychain #{eas_keychain}" : ""
-xcargs "OTHER_CODE_SIGN_FLAGS=\\"#{keychain_arg}\\" -allowProvisioningUpdates"
 export_xcargs "OTHER_CODE_SIGN_FLAGS=\\"#{keychain_arg}\\" -allowProvisioningUpdates"
 
 disable_xcpretty(true)
