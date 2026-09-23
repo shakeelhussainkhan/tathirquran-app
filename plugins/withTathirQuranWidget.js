@@ -201,7 +201,7 @@ provision_map = { "com.fivesllc.tathirquran.widget" => "599853e5-258f-42dd-bd26-
 provision_map["com.fivesllc.tathirquran"] = main_app_profile_uuid if main_app_profile_uuid
 
 export_options({
-  method: "app-store-connect",
+  method: "app-store",
   teamID: "6RB9365RBK",
   signingStyle: "manual",
   provisioningProfiles: provision_map
