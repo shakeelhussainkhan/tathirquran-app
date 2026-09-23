@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.fivesllc.tathirquran",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "infoPlist": {
         "NSUserNotificationsUsageDescription": "TathirQuran sends a daily Quran verse notification",
         "NSMicrophoneUsageDescription": "This app does not use the microphone.",
@@ -25,7 +25,7 @@
     },
     "android": {
       "package": "com.fivesllc.tathirquran",
-      "versionCode": 4,
+      "versionCode": 5,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#faf5e9"
@@ -37,7 +37,8 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      "./plugins/withTathirQuranWidget"
     ],
     "scheme": "tathirquran",
     "experiments": {
