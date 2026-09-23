@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Colors } from '../constants/colors';
 import Constants from 'expo-constants';
+import { useTheme } from '../lib/theme';
 
 const SCHOLARS = [
   { lang: 'English', name: 'M.H. Shakir', school: 'Shia Ithna Ashari', status: 'Live' },
@@ -14,10 +15,11 @@ const SCHOLARS = [
 ];
 
 export default function AboutScreen() {
-  const version = Constants.expoConfig?.version ?? '1.0.0';
+  const theme = useTheme();
+  const version = Constants.expoConfig?.version ?? '1.0.1';
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]} edges={['top', 'bottom']}>
       <View style={styles.goldBar} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
@@ -77,9 +79,8 @@ export default function AboutScreen() {
         {/* Built by */}
         <Text style={styles.sectionLabel}>Built By</Text>
         <Text style={styles.name}>Shakeel Hussain Khan</Text>
-        <Text style={styles.sub}>FCA · CIA · CISA · CRISC</Text>
         <Text style={styles.name}>Syeda Saira Naqvi</Text>
-        <Text style={styles.sub}>Five S LLC · San Jose, CA</Text>
+        <Text style={styles.sub}>San Jose, California</Text>
 
         <View style={styles.divider} />
 
@@ -92,7 +93,7 @@ export default function AboutScreen() {
         <View style={styles.divider} />
 
         <Text style={styles.version}>Version {version}</Text>
-        <Text style={styles.version}>© 2026 Five S LLC</Text>
+        <Text style={styles.version}>© 2026 Five S LLC · tathirquran.com</Text>
       </ScrollView>
       <View style={styles.goldBar} />
     </SafeAreaView>

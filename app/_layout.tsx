@@ -4,6 +4,9 @@ import { Amiri_400Regular, Amiri_700Bold } from '@expo-google-fonts/amiri';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Colors } from '../constants/colors';
 import { Text } from 'react-native';
+import { useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Onboarding from './onboarding';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -11,7 +14,23 @@ export default function RootLayout() {
     Amiri_700Bold,
   });
 
-  if (!fontsLoaded) return null;
+  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem('onboarding_complete').then(val => {
+      setShowOnboarding(val !== 'true');
+    });
+  }, []);
+
+  if (!fontsLoaded || showOnboarding === null) return null;
+
+  if (showOnboarding) {
+    return (
+      <SafeAreaProvider>
+        <Onboarding onComplete={() => setShowOnboarding(false)} />
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <SafeAreaProvider>
@@ -59,6 +78,16 @@ export default function RootLayout() {
             ),
           }}
         />
+        <Tabs.Screen
+          name="settings"
+          options={{
+            title: 'Settings',
+            tabBarIcon: ({ color }) => (
+              <Text style={{ fontSize: 18, color }}>⚙</Text>
+            ),
+          }}
+        />
+        <Tabs.Screen name="onboarding" options={{ href: null }} />
       </Tabs>
     </SafeAreaProvider>
   );

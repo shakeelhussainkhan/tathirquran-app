@@ -2,17 +2,17 @@
   "expo": {
     "name": "TathirQuran",
     "slug": "tathirquran",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "backgroundColor": "#faf5e9",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.fivesllc.tathirquran",
-      "buildNumber": "4",
+      "buildNumber": "5",
       "infoPlist": {
-        "NSUserNotificationsUsageDescription": "TathirQuran sends a daily Quran verse notification",
+        "NSUserNotificationsUsageDescription": "TathirQuran sends you a daily Quran verse reminder each morning.",
         "NSMicrophoneUsageDescription": "This app does not use the microphone.",
         "NSCameraUsageDescription": "This app does not use the camera.",
         "ITSAppUsesNonExemptEncryption": false
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.fivesllc.tathirquran",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#faf5e9"
@@ -39,6 +39,15 @@
         "backgroundColor": "#faf5e9",
         "image": "./assets/splash.png",
         "resizeMode": "contain"
+      }],
+      ["expo-notifications", {
+        "icon": "./assets/icon.png",
+        "color": "#c9a227",
+        "sounds": []
+      }],
+      ["expo-location", {
+        "locationAlwaysAndWhenInUsePermission": "TathirQuran uses your location to calculate accurate Shia prayer times.",
+        "locationWhenInUsePermission": "TathirQuran uses your location to calculate accurate Shia prayer times."
       }]
     ],
     "scheme": "tathirquran",
