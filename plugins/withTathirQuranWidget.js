@@ -64,11 +64,13 @@ widget_target.build_configurations.each do |config|
   config.build_settings['SWIFT_VERSION']              = '5.0'
   config.build_settings['TARGETED_DEVICE_FAMILY']    = '1,2'
   config.build_settings['INFOPLIST_FILE']             = '${WIDGET_TARGET_NAME}/Info.plist'
-  config.build_settings['CODE_SIGN_STYLE']            = 'Automatic'
-  config.build_settings['DEVELOPMENT_TEAM']           = '${TEAM_ID}'
-  config.build_settings['SKIP_INSTALL']               = 'NO'
+  config.build_settings['CODE_SIGN_STYLE']                = 'Manual'
+  config.build_settings['CODE_SIGN_IDENTITY']             = 'iPhone Distribution'
+  config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = '599853e5-258f-42dd-bd26-c1fc9e151867'
+  config.build_settings['DEVELOPMENT_TEAM']               = '${TEAM_ID}'
+  config.build_settings['SKIP_INSTALL']                   = 'NO'
   config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'NO'
-  config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
+  config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']     = '16.0'
 end
 
 widgetkit = project.frameworks_group.new_file('System/Library/Frameworks/WidgetKit.framework')
@@ -177,26 +179,38 @@ eas_keychain = \`security list-keychains -d user 2>/dev/null\`
   .map { |p| p.strip.gsub('"', '') }
   .find { |p| p =~ /eas-build/ }
 
+# Read main app profile UUID from Xcode project (set by EAS CONFIGURE_XCODE_PROJECT)
+main_app_profile_uuid = nil
+begin
+  require 'xcodeproj'
+  xcproj_path = Dir.glob("*.xcodeproj").first
+  if xcproj_path
+    xcproj = Xcodeproj::Project.open(xcproj_path)
+    main_tgt = xcproj.targets.find { |t| t.product_type == 'com.apple.product-type.application' }
+    if main_tgt
+      rel_cfg = main_tgt.build_configurations.find { |c| c.name == 'Release' }
+      main_app_profile_uuid = rel_cfg&.build_settings&.[]('PROVISIONING_PROFILE_SPECIFIER')
+      main_app_profile_uuid ||= rel_cfg&.build_settings&.[]('PROVISIONING_PROFILE')
+    end
+  end
+rescue => e
+  puts "Warning: Could not read main app profile from xcodeproj: #{e.message}"
+end
+
+provision_map = { "com.fivesllc.tathirquran.widget" => "599853e5-258f-42dd-bd26-c1fc9e151867" }
+provision_map["com.fivesllc.tathirquran"] = main_app_profile_uuid if main_app_profile_uuid
+
 export_options({
   method: "app-store-connect",
   teamID: "6RB9365RBK",
-  signingStyle: "automatic",
-  provisioningProfiles: {}
+  signingStyle: "manual",
+  provisioningProfiles: provision_map
 })
 
-# ASC API key for xcodebuild authentication — lets -allowProvisioningUpdates
-# automatically create the com.fivesllc.tathirquran.widget App ID + profile.
-# Key is written to /tmp by the config plugin from EXPO_ASC_KEY_P8 env var.
-asc_key_path = "/tmp/asc_api_key_tathirquran.p8"
-asc_key_id   = "58PZW5VBHA"
-asc_issuer   = "0f79a4f1-b5ba-46fc-bfa9-2bf90d144535"
-auth_flags = File.exist?(asc_key_path) ?
-  "-authenticationKeyPath #{asc_key_path} -authenticationKeyID #{asc_key_id} -authenticationKeyIssuerID #{asc_issuer}" : ""
-
-xcargs "-allowProvisioningUpdates #{auth_flags}"
+xcargs "-allowProvisioningUpdates"
 
 keychain_arg = eas_keychain ? "--keychain #{eas_keychain}" : ""
-export_xcargs "OTHER_CODE_SIGN_FLAGS=\\"#{keychain_arg}\\" -allowProvisioningUpdates #{auth_flags}"
+export_xcargs "OTHER_CODE_SIGN_FLAGS=\\"#{keychain_arg}\\" -allowProvisioningUpdates"
 
 disable_xcpretty(true)
 buildlog_path("./build")
