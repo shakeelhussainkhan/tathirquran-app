@@ -1,7 +1,7 @@
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useState, useRef } from 'react';
-import { Audio } from 'expo-av';
+import { useEffect, useState } from 'react';
+import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { getTodayAyah, getDefaultTranslation, getLiveLanguages, getAllTafsirForAyah } from '../lib/queries';
 import { Colors } from '../constants/colors';
 import { gregorianToHijri } from '../lib/utils';
@@ -27,9 +27,8 @@ export default function HomeScreen() {
   const [tafsirEntries, setTafsirEntries] = useState<any[]>([]);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
-  const soundRef = useRef<Audio.Sound | null>(null);
-  const [playing, setPlaying] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
+  const player = useAudioPlayer(null);
 
   useEffect(() => {
     async function load() {
@@ -73,40 +72,27 @@ export default function HomeScreen() {
 
   const toggleAudio = async () => {
     try {
-      if (playing && soundRef.current) {
-        await soundRef.current.pauseAsync();
-        setPlaying(false);
+      if (player.playing) {
+        player.pause();
         return;
       }
-      if (soundRef.current) {
-        await soundRef.current.playAsync();
-        setPlaying(true);
+      if (player.duration > 0) {
+        player.play();
         return;
       }
       setAudioLoading(true);
       const surahStr = String(ayah?.surah_number || 1).padStart(3, '0');
       const ayahStr = String(ayah?.ayah_number || 1).padStart(3, '0');
       const url = `https://everyayah.com/data/Husary_128kbps/${surahStr}${ayahStr}.mp3`;
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false });
-      const { sound } = await Audio.Sound.createAsync({ uri: url }, { shouldPlay: true });
-      soundRef.current = sound;
-      setPlaying(true);
+      await setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false });
+      player.replace({ uri: url });
+      player.play();
       setAudioLoading(false);
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          setPlaying(false);
-          soundRef.current = null;
-        }
-      });
     } catch (e) {
       console.error('Audio error:', e);
       setAudioLoading(false);
     }
   };
-
-  useEffect(() => {
-    return () => { soundRef.current?.unloadAsync(); };
-  }, []);
 
   if (loading) {
     return (
@@ -173,7 +159,7 @@ export default function HomeScreen() {
         {/* Audio + Share row */}
         <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 8, marginBottom: 20 }}>
           <TouchableOpacity style={styles.playBtn} onPress={toggleAudio} activeOpacity={0.7}>
-            <Text style={styles.playBtnText}>{audioLoading ? 'LOADING...' : playing ? '⏸ PAUSE' : '▶ LISTEN'}</Text>
+            <Text style={styles.playBtnText}>{audioLoading ? 'LOADING...' : player.playing ? '⏸ PAUSE' : '▶ LISTEN'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.playBtn} onPress={handleShare} activeOpacity={0.7}>
             <Text style={styles.playBtnText}>↑ SHARE</Text>
