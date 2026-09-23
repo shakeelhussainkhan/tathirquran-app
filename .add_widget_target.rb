@@ -26,7 +26,7 @@ widget_target.build_configurations.each do |config|
   config.build_settings['INFOPLIST_FILE']             = 'TathirQuranWidget/Info.plist'
   config.build_settings['CODE_SIGN_STYLE']                = 'Manual'
   config.build_settings['CODE_SIGN_IDENTITY']             = 'iPhone Distribution'
-  config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = '599853e5-258f-42dd-bd26-c1fc9e151867'
+  config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = 'd513e963-2c48-4b76-ad8c-152b856a710a'
   config.build_settings['DEVELOPMENT_TEAM']               = '6RB9365RBK'
   config.build_settings['SKIP_INSTALL']                   = 'NO'
   config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'NO'

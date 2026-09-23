@@ -66,7 +66,7 @@ widget_target.build_configurations.each do |config|
   config.build_settings['INFOPLIST_FILE']             = '${WIDGET_TARGET_NAME}/Info.plist'
   config.build_settings['CODE_SIGN_STYLE']                = 'Manual'
   config.build_settings['CODE_SIGN_IDENTITY']             = 'iPhone Distribution'
-  config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = '599853e5-258f-42dd-bd26-c1fc9e151867'
+  config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = 'd513e963-2c48-4b76-ad8c-152b856a710a'
   config.build_settings['DEVELOPMENT_TEAM']               = '${TEAM_ID}'
   config.build_settings['SKIP_INSTALL']                   = 'NO'
   config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'NO'
@@ -197,7 +197,7 @@ rescue => e
   puts "Warning: Could not read main app profile from xcodeproj: #{e.message}"
 end
 
-provision_map = { "com.fivesllc.tathirquran.widget" => "599853e5-258f-42dd-bd26-c1fc9e151867" }
+provision_map = { "com.fivesllc.tathirquran.widget" => "d513e963-2c48-4b76-ad8c-152b856a710a" }
 provision_map["com.fivesllc.tathirquran"] = main_app_profile_uuid if main_app_profile_uuid
 
 export_options({
