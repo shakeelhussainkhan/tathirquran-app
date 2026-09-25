@@ -3,8 +3,9 @@ import {
   ActivityIndicator, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import * as Speech from 'expo-speech';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getTodayAyah, getDefaultTranslation, getLiveLanguages, getAllTafsirForAyah } from '../lib/queries';
@@ -13,7 +14,16 @@ import { gregorianToHijri } from '../lib/utils';
 import { useTheme } from '../lib/theme';
 import { calculatePrayerTimes, formatTime } from '../lib/prayerTimes';
 
-const SCHOLAR_CONFIG: Record<string, { label: string; sublabel: string }> = {
+const REFLECTION_NOTE = 'Written by the TathirQuran team to aid reflection. Not a quotation from any tafsir. Under review by scholars.';
+
+const SCHOLAR_CONFIG: Record<string, { label: string; sublabel?: string; note?: string; hideSourceBook?: boolean }> = {
+  // ── Live ──────────────────────────────────────────────────────────────────
+  'Reflection': {
+    label: 'Reflection — pending scholarly review',
+    hideSourceBook: true,
+    note: REFLECTION_NOTE,
+  },
+  // ── Future verified content ───────────────────────────────────────────────
   "Allamah Tabataba'i": {
     label: 'Al-Mizan',
     sublabel: "Allamah Tabataba'i (RA)",
@@ -24,7 +34,7 @@ const SCHOLAR_CONFIG: Record<string, { label: string; sublabel: string }> = {
   },
 };
 
-const SCHOLAR_ORDER = ["Allamah Tabataba'i", 'Ahlul Bayt (AS)'];
+const SCHOLAR_ORDER = ['Reflection', "Allamah Tabataba'i", 'Ahlul Bayt (AS)'];
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -40,7 +50,14 @@ export default function HomeScreen() {
   const [bookmarked, setBookmarked] = useState(false);
   const [prayerTimes, setPrayerTimes] = useState<any>(null);
   const [showBismillah, setShowBismillah] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const player = useAudioPlayer(null);
+  const currentAyahId = useRef<number | null>(null);
+
+  // Stop TTS on unmount
+  useEffect(() => {
+    return () => { Speech.stop(); };
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -64,6 +81,11 @@ export default function HomeScreen() {
           setAyah(todayAyah);
           setTranslation(trans);
           setTafsirEntries(tafsir);
+          if (currentAyahId.current !== todayAyah.ayah_id) {
+            Speech.stop();
+            setIsSpeaking(false);
+            currentAyahId.current = todayAyah.ayah_id;
+          }
           // Cache for offline
           await AsyncStorage.setItem('cached_ayah', JSON.stringify(todayAyah));
           await AsyncStorage.setItem('cached_translation', JSON.stringify(trans));
@@ -149,7 +171,31 @@ export default function HomeScreen() {
     }
   };
 
+  const toggleSpeech = (text: string) => {
+    if (isSpeaking) {
+      Speech.stop();
+      setIsSpeaking(false);
+      return;
+    }
+    // Pause Quran audio if playing
+    if (player.playing) { player.pause(); }
+    setIsSpeaking(true);
+    Speech.speak(text, {
+      language: 'en-US',
+      rate: 0.9,
+      pitch: 1.0,
+      onDone: () => setIsSpeaking(false),
+      onStopped: () => setIsSpeaking(false),
+      onError: () => setIsSpeaking(false),
+    });
+  };
+
   const toggleAudio = async () => {
+    // Stop TTS when Quran recitation starts
+    if (!player.playing) {
+      Speech.stop();
+      setIsSpeaking(false);
+    }
     try {
       if (player.playing) {
         player.pause();
@@ -315,6 +361,7 @@ export default function HomeScreen() {
               const config = SCHOLAR_CONFIG[scholar];
               const entries = grouped[scholar];
               const isOpen = openSections[scholar];
+              const allText = entries.map(e => e.text).join(' ');
               return (
                 <View key={scholar} style={{ marginBottom: 6 }}>
                   <TouchableOpacity
@@ -337,12 +384,32 @@ export default function HomeScreen() {
 
                   {isOpen && (
                     <View style={styles.tafsirBody}>
+                      {config?.note && (
+                        <Text style={[styles.tafsirNote, { color: theme.textSecondary }]}>
+                          {config.note}
+                        </Text>
+                      )}
+                      {/* TTS listen button */}
+                      <TouchableOpacity
+                        style={[styles.listenBtn, { borderColor: isSpeaking ? theme.gold : 'rgba(201,162,39,0.4)' }]}
+                        onPress={() => toggleSpeech(allText)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.listenBtnText, { color: theme.gold }]}>
+                          {isSpeaking ? '■ STOP' : '🔊 LISTEN'}
+                        </Text>
+                      </TouchableOpacity>
                       {entries.map((entry, i) => (
                         <View key={entry.id}>
                           <Text style={[styles.tafsirText, { color: theme.text }]}>{entry.text}</Text>
-                          <Text style={[styles.tafsirSource, i < entries.length - 1 && { marginBottom: 14 }, { color: theme.bronze }]}>
-                            — {entry.source_book}
-                          </Text>
+                          {!config?.hideSourceBook && (
+                            <Text style={[styles.tafsirSource, i < entries.length - 1 && { marginBottom: 14 }, { color: theme.bronze }]}>
+                              — {entry.source_book}
+                            </Text>
+                          )}
+                          {config?.hideSourceBook && i < entries.length - 1 && (
+                            <View style={{ height: 14 }} />
+                          )}
                         </View>
                       ))}
                     </View>
@@ -515,6 +582,26 @@ const styles = StyleSheet.create({
     borderLeftWidth: 2,
     borderLeftColor: 'rgba(201,162,39,0.3)',
     marginTop: 2,
+  },
+  tafsirNote: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 12,
+    fontStyle: 'italic',
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  listenBtn: {
+    alignSelf: 'flex-start',
+    borderWidth: 0.5,
+    borderRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginBottom: 12,
+  },
+  listenBtnText: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 12,
+    letterSpacing: 1,
   },
   tafsirText: {
     fontFamily: 'Amiri_400Regular',

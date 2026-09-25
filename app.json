@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.fivesllc.tathirquran",
-      "buildNumber": "6",
+      "buildNumber": "7",
       "infoPlist": {
         "NSUserNotificationsUsageDescription": "TathirQuran sends you a daily Quran verse reminder each morning.",
         "NSMicrophoneUsageDescription": "This app does not use the microphone.",
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.fivesllc.tathirquran",
-      "versionCode": 7,
+      "versionCode": 8,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#faf5e9"
