@@ -2,7 +2,7 @@
   "expo": {
     "name": "TathirQuran",
     "slug": "tathirquran",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.fivesllc.tathirquran",
-      "buildNumber": "5",
+      "buildNumber": "6",
       "infoPlist": {
         "NSUserNotificationsUsageDescription": "TathirQuran sends you a daily Quran verse reminder each morning.",
         "NSMicrophoneUsageDescription": "This app does not use the microphone.",
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.fivesllc.tathirquran",
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#faf5e9"
@@ -35,21 +35,30 @@
       "expo-font",
       "./plugins/withTathirQuranWidget",
       "expo-asset",
-      ["expo-splash-screen", {
-        "backgroundColor": "#faf5e9",
-        "image": "./assets/splash.png",
-        "resizeMode": "contain"
-      }],
-      ["expo-notifications", {
-        "icon": "./assets/icon.png",
-        "color": "#c9a227",
-        "sounds": [],
-        "mode": "production"
-      }],
-      ["expo-location", {
-        "locationAlwaysAndWhenInUsePermission": "TathirQuran uses your location to calculate accurate Shia prayer times.",
-        "locationWhenInUsePermission": "TathirQuran uses your location to calculate accurate Shia prayer times."
-      }]
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#faf5e9",
+          "image": "./assets/splash.png",
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#c9a227",
+          "sounds": [],
+          "mode": "production"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "TathirQuran uses your location to calculate accurate Shia prayer times.",
+          "locationWhenInUsePermission": "TathirQuran uses your location to calculate accurate Shia prayer times."
+        }
+      ]
     ],
     "scheme": "tathirquran",
     "experiments": {

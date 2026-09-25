@@ -1,4 +1,6 @@
 import { useColorScheme } from 'react-native';
+import { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const lightTheme = {
   bg: '#faf5e9',
@@ -25,6 +27,20 @@ export const darkTheme = {
 export type Theme = typeof lightTheme;
 
 export function useTheme(): Theme {
-  const scheme = useColorScheme();
-  return scheme === 'dark' ? darkTheme : lightTheme;
+  const systemScheme = useColorScheme();
+  const [manualMode, setManualMode] = useState<'light' | 'dark' | 'system'>('system');
+
+  useEffect(() => {
+    AsyncStorage.getItem('theme_mode').then(val => {
+      if (val === 'light' || val === 'dark' || val === 'system') {
+        setManualMode(val);
+      }
+    });
+  }, []);
+
+  const isDark =
+    manualMode === 'dark' ||
+    (manualMode === 'system' && systemScheme === 'dark');
+
+  return isDark ? darkTheme : lightTheme;
 }

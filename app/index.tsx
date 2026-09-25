@@ -59,7 +59,7 @@ export default function HomeScreen() {
         if (todayAyah) {
           const [trans, tafsir] = await Promise.all([
             getDefaultTranslation(todayAyah.ayah_id, lang),
-            getAllTafsirForAyah(todayAyah.ayah_id, lang),
+            getAllTafsirForAyah(todayAyah.ayah_id, 'en'),
           ]);
           setAyah(todayAyah);
           setTranslation(trans);
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
   },
   headerDate: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 11,
+    fontSize: 12,
     letterSpacing: 0.5,
   },
   scroll: { padding: 28, alignItems: 'center' },
@@ -424,13 +424,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontStyle: 'italic',
     textAlign: 'center',
-    lineHeight: 32,
+    lineHeight: 34,
     marginBottom: 12,
     paddingHorizontal: 8,
   },
   ref: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 12,
+    fontSize: 13,
     letterSpacing: 2,
     textAlign: 'center',
     marginBottom: 4,
@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
   langSection: { width: '100%', marginBottom: 16 },
   langLabel: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 2,
     marginBottom: 8,
   },
@@ -475,12 +475,12 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   prayerName: {
-    fontSize: 8,
+    fontSize: 10,
     color: '#8b6520',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
-  prayerTime: { fontSize: 11, fontWeight: '500', marginTop: 2 },
+  prayerTime: { fontSize: 13, fontWeight: '500', marginTop: 2 },
   tafsirContainer: { width: '100%', marginTop: 8, gap: 8 },
   tafsirBtn: {
     borderWidth: 0.5,
@@ -518,14 +518,14 @@ const styles = StyleSheet.create({
   },
   tafsirText: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 15,
+    fontSize: 16,
     fontStyle: 'italic',
-    lineHeight: 24,
+    lineHeight: 26,
     marginBottom: 8,
   },
   tafsirSource: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 11,
+    fontSize: 12,
     letterSpacing: 0.5,
     marginBottom: 4,
   },

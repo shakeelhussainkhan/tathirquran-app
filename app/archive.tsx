@@ -178,9 +178,9 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   row: { padding: 16, borderBottomWidth: 0.5, flexDirection: 'row', alignItems: 'center' },
-  rowDate: { fontFamily: 'Amiri_400Regular', fontSize: 10, letterSpacing: 1, marginBottom: 3 },
-  rowSurah: { fontFamily: 'Amiri_400Regular', fontSize: 12, letterSpacing: 0.5, marginBottom: 3 },
-  rowArabic: { fontFamily: 'Amiri_700Bold', fontSize: 18, textAlign: 'right', writingDirection: 'rtl' },
+  rowDate: { fontFamily: 'Amiri_400Regular', fontSize: 11, letterSpacing: 0.5, marginBottom: 3 },
+  rowSurah: { fontFamily: 'Amiri_400Regular', fontSize: 13, letterSpacing: 0.5, marginBottom: 3 },
+  rowArabic: { fontFamily: 'Amiri_700Bold', fontSize: 20, textAlign: 'right', writingDirection: 'rtl' },
   bmTranslation: {
     fontFamily: 'Amiri_400Regular',
     fontSize: 12,

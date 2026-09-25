@@ -31,19 +31,24 @@ export default function SettingsScreen() {
   const [showBismillah, setShowBismillah] = useState(true);
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [notifHour, setNotifHour] = useState(7);
+  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
 
   useEffect(() => {
     (async () => {
-      const [lang, trans, tafsir, bism] = await Promise.all([
+      const [lang, trans, tafsir, bism, savedTheme] = await Promise.all([
         AsyncStorage.getItem('selected_language'),
         AsyncStorage.getItem('selected_translation'),
         AsyncStorage.getItem('show_tafsir'),
         AsyncStorage.getItem('show_bismillah'),
+        AsyncStorage.getItem('theme_mode'),
       ]);
       if (lang) setLanguage(lang);
       if (trans) setTranslation(trans);
       setShowTafsir(tafsir !== 'false');
       setShowBismillah(bism !== 'false');
+      if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') {
+        setThemeMode(savedTheme);
+      }
       const notif = await getNotificationSettings();
       setNotifEnabled(notif.enabled);
       setNotifHour(notif.hour);
@@ -68,6 +73,11 @@ export default function SettingsScreen() {
   const toggleBismillah = async (val: boolean) => {
     setShowBismillah(val);
     await AsyncStorage.setItem('show_bismillah', String(val));
+  };
+
+  const handleThemeChange = async (mode: 'light' | 'dark' | 'system') => {
+    setThemeMode(mode);
+    await AsyncStorage.setItem('theme_mode', mode);
   };
 
   const toggleNotif = async (val: boolean) => {
@@ -149,6 +159,34 @@ export default function SettingsScreen() {
             trackColor={{ false: 'rgba(139,101,32,0.2)', true: theme.gold }}
             thumbColor={theme.bg}
           />
+        </View>
+
+        <View style={s.row}>
+          <Text style={s.rowLabel}>Theme</Text>
+          <View style={{ flexDirection: 'row', gap: 4 }}>
+            {(['light', 'system', 'dark'] as const).map(mode => (
+              <TouchableOpacity
+                key={mode}
+                onPress={() => handleThemeChange(mode)}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 4,
+                  borderWidth: 0.5,
+                  borderColor: themeMode === mode ? '#c9a227' : 'rgba(201,162,39,0.25)',
+                  backgroundColor: themeMode === mode ? '#c9a227' : 'transparent',
+                }}
+              >
+                <Text style={{
+                  fontSize: 10,
+                  color: themeMode === mode ? '#fff' : '#8b6520',
+                  textTransform: 'capitalize',
+                }}>
+                  {mode}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* NOTIFICATIONS */}
@@ -235,7 +273,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     },
     sectionHeader: {
       fontFamily: 'Amiri_400Regular',
-      fontSize: 8,
+      fontSize: 10,
       color: theme.gold,
       letterSpacing: 2,
       textTransform: 'uppercase',
@@ -245,7 +283,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     },
     rowGroupLabel: {
       fontFamily: 'Amiri_400Regular',
-      fontSize: 10,
+      fontSize: 11,
       color: theme.textSecondary,
       letterSpacing: 1,
       paddingHorizontal: 20,
@@ -258,14 +296,14 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: 20,
-      paddingVertical: 12,
+      paddingVertical: 14,
       borderBottomWidth: 0.5,
       borderBottomColor: 'rgba(201,162,39,0.12)',
       backgroundColor: theme.bg,
     },
     rowLabel: {
       fontFamily: 'Amiri_400Regular',
-      fontSize: 13,
+      fontSize: 14,
       color: theme.text,
     },
     rowValue: {
