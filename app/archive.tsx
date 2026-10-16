@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRecentSchedule } from '../lib/queries';
 import { getAllNoteEntries, type AyahNotesEntry } from '../lib/notes';
 import NoteTagsEditor from '../components/NoteTagsEditor';
+import { listMemorized, setMemorized, type MemorizedEntry } from '../lib/memorization';
 import { Colors } from '../constants/colors';
 import { useTheme } from '../lib/theme';
 
@@ -24,9 +25,10 @@ export default function ArchiveScreen() {
   const [schedule, setSchedule] = useState<any[]>([]);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'archive' | 'bookmarks' | 'notes'>('archive');
+  const [tab, setTab] = useState<'archive' | 'bookmarks' | 'notes' | 'memorized'>('archive');
   const [noteEntries, setNoteEntries] = useState<AyahNotesEntry[]>([]);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [memorized, setMemorizedList] = useState<MemorizedEntry[]>([]);
 
   useEffect(() => {
     getRecentSchedule(60).then(data => { setSchedule(data); setLoading(false); });
@@ -36,11 +38,17 @@ export default function ArchiveScreen() {
     useCallback(() => {
       loadBookmarks();
       loadNotes();
+      listMemorized().then(setMemorizedList);
     }, [])
   );
 
   const loadNotes = async () => {
     setNoteEntries(await getAllNoteEntries());
+  };
+
+  const removeMemorized = async (entry: MemorizedEntry) => {
+    await setMemorized({ surah: entry.surah, ayah: entry.ayah }, false);
+    setMemorizedList(prev => prev.filter(m => m.key !== entry.key));
   };
 
   const notesWithText = noteEntries.filter(e => e.note.trim().length > 0);
@@ -112,6 +120,14 @@ export default function ArchiveScreen() {
         >
           <Text style={[styles.tabBtnText, { color: tab === 'notes' ? theme.gold : theme.textSecondary }]}>
             MY NOTES {notesWithText.length > 0 ? `(${notesWithText.length})` : ''}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, tab === 'memorized' && [styles.tabBtnActive, { borderBottomColor: theme.gold }]]}
+          onPress={() => setTab('memorized')}
+        >
+          <Text style={[styles.tabBtnText, { color: tab === 'memorized' ? theme.gold : theme.textSecondary }]}>
+            MEMORIZED {memorized.length > 0 ? `(${memorized.length})` : ''}
           </Text>
         </TouchableOpacity>
       </View>
@@ -191,6 +207,39 @@ export default function ArchiveScreen() {
                 </View>
               );
             })
+          )}
+        </ScrollView>
+      ) : tab === 'memorized' ? (
+        <ScrollView>
+          {memorized.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                No ayahs marked as memorized yet.{'\n'}Open Memorize mode on the Today screen and tap “Mark as memorized”.
+              </Text>
+            </View>
+          ) : (
+            memorized.map(m => (
+              <View key={m.key} style={[styles.row, { borderBottomColor: theme.border }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.rowSurah, { color: theme.gold }]}>
+                    ✓ {m.surahName ? `${m.surahName} ` : ''}{m.surah}:{m.ayah}
+                  </Text>
+                  {m.arabic ? (
+                    <Text style={[styles.rowArabic, { color: theme.text }]} numberOfLines={1}>
+                      {m.arabic}
+                    </Text>
+                  ) : null}
+                  {m.translation ? (
+                    <Text style={[styles.bmTranslation, { color: theme.textSecondary }]} numberOfLines={2}>
+                      {m.translation}
+                    </Text>
+                  ) : null}
+                </View>
+                <TouchableOpacity onPress={() => removeMemorized(m)} style={styles.removeBtn}>
+                  <Text style={{ color: theme.textSecondary, fontSize: 16 }}>×</Text>
+                </TouchableOpacity>
+              </View>
+            ))
           )}
         </ScrollView>
       ) : (
