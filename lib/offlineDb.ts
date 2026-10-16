@@ -13,6 +13,11 @@
  *   - daily_schedule   (date -> ayah_id for the whole published schedule)
  *   - languages        (language picker metadata)
  *   - tafsir           (the existing Reflection rows, exactly as stored)
+ *   - ayah_words       (word-by-word LEXICAL glosses — dictionary meanings
+ *                        of single words, NOT tafsir; synced TOLERANTLY in
+ *                        its own step because the Supabase table only
+ *                        exists once migration 011 has been run: its
+ *                        absence must never fail the main sync)
  *
  * Content rule: this module ONLY mirrors rows that already exist in
  * Supabase. It never adds, substitutes or "completes" any translation or
@@ -144,6 +149,16 @@ CREATE TABLE IF NOT EXISTS tafsir (
   created_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_offline_tafsir_ayah ON tafsir(ayah_id);
+CREATE TABLE IF NOT EXISTS ayah_words (
+  id INTEGER PRIMARY KEY,
+  ayah_id INTEGER,
+  position INTEGER,
+  arabic_text TEXT,
+  transliteration TEXT,
+  translation_en TEXT,
+  UNIQUE(ayah_id, position)
+);
+CREATE INDEX IF NOT EXISTS idx_offline_ayah_words_ayah ON ayah_words(ayah_id);
 `;
 
 // ---------------------------------------------------------------------------
@@ -201,6 +216,18 @@ const TABLE_SPECS: TableSpec[] = [
     orderBy: 'id',
   },
 ];
+
+/**
+ * ayah_words spec — deliberately NOT part of TABLE_SPECS: it is fetched and
+ * stored in a separate tolerant step (see syncOfflineData) so a missing
+ * Supabase table (migration 011 not run yet) can never fail the main sync.
+ */
+const AYAH_WORDS_SPEC: TableSpec = {
+  table: 'ayah_words',
+  label: 'Word-by-word glosses',
+  columns: ['id', 'ayah_id', 'position', 'arabic_text', 'transliteration', 'translation_en'],
+  orderBy: 'id',
+};
 
 type Row = Record<string, unknown>;
 
@@ -282,6 +309,16 @@ export function syncOfflineData(
         fetched.set(spec.table, await fetchAllRows(spec, options.onProgress));
       }
 
+      // Word-by-word glosses, tolerantly: null means "unavailable upstream"
+      // (table missing or fetch failed) — the local copy is then left as-is
+      // and the word-by-word UI simply stays hidden offline.
+      let wordRows: Row[] | null = null;
+      try {
+        wordRows = await fetchAllRows(AYAH_WORDS_SPEC, options.onProgress);
+      } catch {
+        wordRows = null;
+      }
+
       const ayahCount = fetched.get('ayahs')?.length ?? 0;
       const translationTextCount = fetched.get('ayah_translations')?.length ?? 0;
       const scheduleCount = fetched.get('daily_schedule')?.length ?? 0;
@@ -293,6 +330,10 @@ export function syncOfflineData(
         for (const spec of TABLE_SPECS) {
           await db.runAsync(`DELETE FROM ${spec.table}`);
           await insertRows(db, spec, fetched.get(spec.table) ?? []);
+        }
+        if (wordRows !== null) {
+          await db.runAsync(`DELETE FROM ayah_words`);
+          await insertRows(db, AYAH_WORDS_SPEC, wordRows);
         }
       });
 
@@ -437,6 +478,23 @@ export async function localGetLiveLanguages(): Promise<Row[]> {
     `SELECT * FROM languages WHERE launch_status IN ('live', 'beta') ORDER BY display_order ASC`,
   );
   return rows.map((r) => ({ ...r, rtl: r.rtl === 1 || r.rtl === true }));
+}
+
+/** Word-by-word lexical glosses for one ayah from the local store, in word
+ *  order. [] when the local store is unavailable or holds no words (which
+ *  is the case until migration 011 + the loader have populated Supabase and
+ *  a sync has run) — callers then try Supabase and otherwise hide the UI. */
+export async function localGetAyahWords(ayahId: number): Promise<Row[]> {
+  const db = await getOfflineDb();
+  if (!db) return [];
+  try {
+    return await db.getAllAsync<Row>(
+      'SELECT * FROM ayah_words WHERE ayah_id = ? ORDER BY position ASC',
+      [ayahId],
+    );
+  } catch {
+    return [];
+  }
 }
 
 export async function localGetTafsir(ayahId: number, languageCode: string): Promise<Row[]> {
