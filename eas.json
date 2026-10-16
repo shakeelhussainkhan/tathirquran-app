@@ -20,7 +20,6 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "shakeelhussain@hotmail.com",
         "ascAppId": "6811745113",
         "appleTeamId": "6RB9365RBK"
       }

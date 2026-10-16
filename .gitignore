@@ -40,3 +40,8 @@ yarn-error.*
 /ios
 /android
 *.ipa
+
+# Never commit secrets (.env was committed with the Supabase anon key —
+# the `.env*.local` pattern above does not match plain `.env`)
+.env
+!.env.example
