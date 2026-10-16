@@ -192,7 +192,9 @@ export default function AyahDetailScreen() {
                   <View key={entry.id} style={[styles.tafsirBlock, { borderLeftColor: theme.border }]}>
                     <Text style={[styles.tafsirLabel, { color: theme.textSecondary }]}>
                       {isReflection
-                        ? 'Reflection — pending scholarly review'
+                        ? entry.review_status === 'approved'
+                          ? 'Reflection'
+                          : 'Reflection — pending scholarly review'
                         : entry.scholar}
                     </Text>
                     <Text style={[styles.tafsirText, { color: theme.text }]}>{entry.text}</Text>
