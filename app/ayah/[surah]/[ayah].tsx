@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAyahDetail } from '../../../lib/queries';
 import { Colors } from '../../../constants/colors';
 import { useTheme } from '../../../lib/theme';
+import NoteTagsEditor from '../../../components/NoteTagsEditor';
 
 // Same honest labelling as the Today screen: the "Reflection" rows are
 // AI-written pending scholarly review, never presented as a scholarly quote.
@@ -210,6 +211,14 @@ export default function AyahDetailScreen() {
               })}
             </View>
           )}
+
+          {/* Personal note & tags (stored on this device only) */}
+          <NoteTagsEditor
+            key={`${surahNumber}_${ayahNumber}`}
+            surah={surahNumber}
+            ayah={ayahNumber}
+            theme={theme}
+          />
 
           <View style={[styles.nav, { borderTopColor: theme.border }]}>
             {ayahNumber > 1 ? (

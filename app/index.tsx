@@ -12,6 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import ShareVerseCard from '../components/ShareVerseCard';
+import NoteTagsEditor from '../components/NoteTagsEditor';
 import { getTodayAyah, getDefaultTranslation, getLiveLanguages, getAllTafsirForAyah } from '../lib/queries';
 import {
   splitAyahWords, nextWordToHide, nextWordToReveal,
@@ -590,6 +591,16 @@ export default function HomeScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Personal note & tags (stored on this device only) */}
+        {ayah && (
+          <NoteTagsEditor
+            key={`${ayah.surah_number}_${ayah.ayah_number}`}
+            surah={ayah.surah_number}
+            ayah={ayah.ayah_number}
+            theme={theme}
+          />
+        )}
 
         {/* Memorization panel */}
         {memorizeMode && (
