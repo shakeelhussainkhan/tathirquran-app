@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Switch, TouchableOpacity, StyleSheet, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Switch, TouchableOpacity, StyleSheet, Linking, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
@@ -11,6 +11,16 @@ import {
   getNotificationSettings,
 } from '../lib/notifications';
 import { getOfflineSyncStatus, syncOfflineData, type OfflineSyncStatus } from '../lib/offlineDb';
+import ReciterPicker from '../components/ReciterPicker';
+import {
+  DEFAULT_RECITER,
+  clearDownloads,
+  formatBytes,
+  getDownloadsSizeBytes,
+  getSelectedReciter,
+  setSelectedReciter,
+  type Reciter,
+} from '../lib/reciters';
 import {
   getStreakState,
   milestoneForStreak,
@@ -41,6 +51,9 @@ export default function SettingsScreen() {
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [notifHour, setNotifHour] = useState(7);
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
+  const [reciter, setReciter] = useState<Reciter>(DEFAULT_RECITER);
+  const [downloadsSize, setDownloadsSize] = useState(0);
+  const [clearingDownloads, setClearingDownloads] = useState(false);
   const [offlineStatus, setOfflineStatus] = useState<OfflineSyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncStage, setSyncStage] = useState('');
@@ -66,6 +79,8 @@ export default function SettingsScreen() {
       setNotifEnabled(notif.enabled);
       setNotifHour(notif.hour);
       setStreak(await getStreakState());
+      setReciter(await getSelectedReciter());
+      setDownloadsSize(await getDownloadsSizeBytes());
     })();
   }, []);
 
@@ -77,11 +92,51 @@ export default function SettingsScreen() {
     }
   }, []);
 
+  const refreshAudioState = useCallback(async () => {
+    try {
+      setReciter(await getSelectedReciter());
+      setDownloadsSize(await getDownloadsSizeBytes());
+    } catch {
+      // Best-effort display only.
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       void refreshOfflineStatus();
-    }, [refreshOfflineStatus])
+      void refreshAudioState();
+    }, [refreshOfflineStatus, refreshAudioState])
   );
+
+  const handleReciterChange = async (next: Reciter) => {
+    setReciter(next);
+    await setSelectedReciter(next);
+  };
+
+  const handleClearDownloads = () => {
+    if (clearingDownloads || downloadsSize === 0) return;
+    Alert.alert(
+      'Clear downloaded audio?',
+      'This removes all downloaded recitation audio from this device. You can download any ayah again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            setClearingDownloads(true);
+            try {
+              await clearDownloads();
+              setDownloadsSize(0);
+            } finally {
+              setClearingDownloads(false);
+              void refreshAudioState();
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleOfflineSync = async () => {
     if (syncing) return;
@@ -261,6 +316,34 @@ export default function SettingsScreen() {
             </View>
           </View>
         )}
+
+        {/* RECITATION */}
+        <Text style={s.sectionHeader}>RECITATION</Text>
+
+        <Text style={s.rowGroupLabel}>Reciter</Text>
+        <ReciterPicker selected={reciter} onSelect={handleReciterChange} variant="rows" />
+
+        <View style={s.row}>
+          <Text style={s.rowLabel}>Downloaded audio</Text>
+          <Text style={s.rowValue}>{downloadsSize > 0 ? formatBytes(downloadsSize) : 'None'}</Text>
+        </View>
+
+        <TouchableOpacity
+          style={s.row}
+          onPress={handleClearDownloads}
+          disabled={clearingDownloads || downloadsSize === 0}
+        >
+          <Text style={[s.rowLabel, downloadsSize === 0 && { opacity: 0.5 }]}>Clear downloads</Text>
+          {clearingDownloads ? (
+            <ActivityIndicator size="small" color={theme.gold} />
+          ) : (
+            <Text style={[s.rowLink, downloadsSize === 0 && { opacity: 0.5 }]}>Clear</Text>
+          )}
+        </TouchableOpacity>
+
+        <Text style={s.syncNote}>
+          Downloaded ayahs play offline and are preferred over streaming. Audio is stored only on this device.
+        </Text>
 
         {/* OFFLINE */}
         <Text style={s.sectionHeader}>OFFLINE DATA</Text>
