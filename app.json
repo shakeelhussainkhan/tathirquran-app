@@ -58,7 +58,8 @@
           "locationAlwaysAndWhenInUsePermission": "TathirQuran uses your location to calculate accurate Shia prayer times.",
           "locationWhenInUsePermission": "TathirQuran uses your location to calculate accurate Shia prayer times."
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "scheme": "tathirquran",
     "experiments": {
