@@ -79,6 +79,15 @@ export default function RootLayout() {
           }}
         />
         <Tabs.Screen
+          name="qibla"
+          options={{
+            title: 'Qibla',
+            tabBarIcon: ({ color }) => (
+              <Text style={{ fontSize: 18, color }}>🧭</Text>
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="about"
           options={{
             title: 'About',
