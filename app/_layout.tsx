@@ -7,6 +7,7 @@ import { Text } from 'react-native';
 import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Onboarding from './onboarding';
+import { ensureOfflineData } from '../lib/offlineDb';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -20,6 +21,9 @@ export default function RootLayout() {
     AsyncStorage.getItem('onboarding_complete').then(val => {
       setShowOnboarding(val !== 'true');
     });
+    // Offline-first: mirror the full Quran corpus locally on first launch
+    // (and refresh it when stale). Fire-and-forget — never blocks launch.
+    void ensureOfflineData();
   }, []);
 
   if (!fontsLoaded || showOnboarding === null) return null;
