@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import * as Speech from 'expo-speech';
 import * as Location from 'expo-location';
@@ -45,6 +46,7 @@ const SCHOLAR_ORDER = ['Reflection', "Allamah Tabataba'i", 'Ahlul Bayt (AS)'];
 
 export default function HomeScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const [ayah, setAyah] = useState<any>(null);
   const [translation, setTranslation] = useState<any>(null);
   const [languages, setLanguages] = useState<any[]>([]);
@@ -398,6 +400,18 @@ export default function HomeScreen() {
             ))}
           </ScrollView>
         )}
+
+        {/* Qibla entry point */}
+        <TouchableOpacity
+          style={[styles.tafsirBtn, { borderColor: theme.border, marginTop: 10 }]}
+          onPress={() => router.push('/qibla')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tafsirBtnText, { color: theme.bronze, flex: 1 }]}>
+            🧭 QIBLA DIRECTION
+          </Text>
+          <Text style={[styles.tafsirChevron, { color: theme.bronze }]}>→</Text>
+        </TouchableOpacity>
 
         {/* Tafsir */}
         {scholars.length === 0 ? (
