@@ -67,6 +67,7 @@ export default function HomeScreen() {
   const [bookmarked, setBookmarked] = useState(false);
   const [prayerTimes, setPrayerTimes] = useState<any>(null);
   const [showBismillah, setShowBismillah] = useState(true);
+  const [showTransliteration, setShowTransliteration] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [sharingCard, setSharingCard] = useState(false);
   const shareCardRef = useRef<View>(null);
@@ -111,6 +112,9 @@ export default function HomeScreen() {
     async function load() {
       const bismPref = await AsyncStorage.getItem('show_bismillah');
       setShowBismillah(bismPref !== 'false');
+
+      const translitPref = await AsyncStorage.getItem('show_transliteration');
+      setShowTransliteration(translitPref === 'true');
 
       const savedLang = await AsyncStorage.getItem('selected_language');
       const lang = savedLang || 'en';
@@ -491,6 +495,15 @@ export default function HomeScreen() {
         ) : (
           <Text style={[styles.arabic, { color: theme.text }]}>{ayah?.arabic_uthmani}</Text>
         )}
+
+        {/* Transliteration — phonetic transcription of the Arabic (not a
+            translation). Hidden entirely until the loader populates the field. */}
+        {showTransliteration && ayah?.transliteration ? (
+          <>
+            <Text style={[styles.transliterationLabel, { color: theme.bronze }]}>TRANSLITERATION</Text>
+            <Text style={[styles.transliteration, { color: theme.textSecondary }]}>{ayah.transliteration}</Text>
+          </>
+        ) : null}
 
         {/* Ornament */}
         <View style={styles.ornament}>
@@ -887,6 +900,23 @@ const styles = StyleSheet.create({
     writingDirection: 'rtl',
     lineHeight: 56,
     marginBottom: 4,
+  },
+  transliterationLabel: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 11,
+    letterSpacing: 2,
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 2,
+  },
+  transliteration: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 17,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    lineHeight: 26,
+    marginBottom: 8,
+    paddingHorizontal: 8,
   },
   ornament: {
     flexDirection: 'row',
