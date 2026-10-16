@@ -38,6 +38,7 @@ export default function SettingsScreen() {
   const [translation, setTranslation] = useState('shakir');
   const [showTafsir, setShowTafsir] = useState(true);
   const [showBismillah, setShowBismillah] = useState(true);
+  const [showTransliteration, setShowTransliteration] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [notifHour, setNotifHour] = useState(7);
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
@@ -48,17 +49,19 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     (async () => {
-      const [lang, trans, tafsir, bism, savedTheme] = await Promise.all([
+      const [lang, trans, tafsir, bism, translit, savedTheme] = await Promise.all([
         AsyncStorage.getItem('selected_language'),
         AsyncStorage.getItem('selected_translation'),
         AsyncStorage.getItem('show_tafsir'),
         AsyncStorage.getItem('show_bismillah'),
+        AsyncStorage.getItem('show_transliteration'),
         AsyncStorage.getItem('theme_mode'),
       ]);
       if (lang) setLanguage(lang);
       if (trans) setTranslation(trans);
       setShowTafsir(tafsir !== 'false');
       setShowBismillah(bism !== 'false');
+      setShowTransliteration(translit === 'true');
       if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') {
         setThemeMode(savedTheme);
       }
@@ -118,6 +121,11 @@ export default function SettingsScreen() {
   const toggleBismillah = async (val: boolean) => {
     setShowBismillah(val);
     await AsyncStorage.setItem('show_bismillah', String(val));
+  };
+
+  const toggleTransliteration = async (val: boolean) => {
+    setShowTransliteration(val);
+    await AsyncStorage.setItem('show_transliteration', String(val));
   };
 
   const handleThemeChange = async (mode: 'light' | 'dark' | 'system') => {
@@ -201,6 +209,16 @@ export default function SettingsScreen() {
           <Switch
             value={showBismillah}
             onValueChange={toggleBismillah}
+            trackColor={{ false: 'rgba(139,101,32,0.2)', true: theme.gold }}
+            thumbColor={theme.bg}
+          />
+        </View>
+
+        <View style={s.row}>
+          <Text style={s.rowLabel}>Show transliteration</Text>
+          <Switch
+            value={showTransliteration}
+            onValueChange={toggleTransliteration}
             trackColor={{ false: 'rgba(139,101,32,0.2)', true: theme.gold }}
             thumbColor={theme.bg}
           />
