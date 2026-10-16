@@ -23,15 +23,24 @@ import {
   type Reciter,
 } from '../lib/reciters';
 import NoteTagsEditor from '../components/NoteTagsEditor';
-import { getTodayAyah, getDefaultTranslation, getLiveLanguages, getAllTafsirForAyah } from '../lib/queries';
+import { getTodayAyah, getDefaultTranslation, getLiveLanguages, getAllTafsirForAyah, getSurahNames } from '../lib/queries';
 import {
   splitAyahWords, nextWordToHide, nextWordToReveal,
   isMemorized as fetchIsMemorized, setMemorized as storeSetMemorized,
 } from '../lib/memorization';
+import {
+  loadKhatmahState,
+  markPortionDone,
+  getKhatmahProgress,
+  type KhatmahState,
+} from '../lib/khatmah';
+import KhatmahCard from '../components/KhatmahCard';
 import { Colors } from '../constants/colors';
 import { gregorianToHijri } from '../lib/utils';
 import { useTheme } from '../lib/theme';
 import { calculatePrayerTimes, formatTime } from '../lib/prayerTimes';
+import { getTodayDevotionals, isThursdayEvening, type TodayDevotionals } from '../lib/devotionals';
+import DevotionalCard from '../components/DevotionalCard';
 import {
   recordDailyVerseView,
   streakLabel,
@@ -83,12 +92,15 @@ export default function HomeScreen() {
   const [sharingCard, setSharingCard] = useState(false);
   const shareCardRef = useRef<View>(null);
   const [streak, setStreak] = useState<StreakState | null>(null);
+  const [devotionals, setDevotionals] = useState<TodayDevotionals | null>(null);
   const [streakMilestone, setStreakMilestone] = useState<StreakMilestone | null>(null);
   const [streakReturned, setStreakReturned] = useState(false);
   const [reciter, setReciter] = useState<Reciter>(DEFAULT_RECITER);
   const [audioDownloaded, setAudioDownloaded] = useState(false);
   const [downloadingAudio, setDownloadingAudio] = useState(false);
   const [downloadFailed, setDownloadFailed] = useState(false);
+  const [khatmahState, setKhatmahState] = useState<KhatmahState | null>(null);
+  const [khatmahSurahNames, setKhatmahSurahNames] = useState<string[]>([]);
   const player = useAudioPlayer(null);
   const playerStatus = useAudioPlayerStatus(player);
   const currentAyahId = useRef<number | null>(null);
@@ -191,6 +203,29 @@ export default function HomeScreen() {
     load();
   }, []);
 
+  // Khatmah reading plan: refresh on focus so a portion marked read on
+  // the plan screen (or a plan just started/ended) is reflected here.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const saved = await loadKhatmahState();
+        if (cancelled) return;
+        setKhatmahState(saved);
+        if (saved) {
+          const names = await getSurahNames();
+          if (!cancelled && names.length > 0) setKhatmahSurahNames(names);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, []),
+  );
+
+  const handleKhatmahMarkDone = async (portionIndex: number) => {
+    if (!khatmahState) return;
+    setKhatmahState(await markPortionDone(khatmahState, portionIndex));
+  };
+
   // Check bookmark state when ayah loads
   useEffect(() => {
     if (ayah) {
@@ -260,6 +295,18 @@ export default function HomeScreen() {
       setDownloadingAudio(false);
     }
   };
+  // Devotionals (occasion duas & ziyarat): best-effort — an empty seed or
+  // a missing table simply means no cards are shown. Never placeholder text.
+  useEffect(() => {
+    (async () => {
+      try {
+        setDevotionals(await getTodayDevotionals());
+      } catch {
+        setDevotionals(null);
+      }
+    })();
+  }, []);
+
   // Check memorized state and reset memorization display when ayah changes
   useEffect(() => {
     if (ayah) {
@@ -654,6 +701,21 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {/* Devotional cards — only when a matching devotional_texts row exists */}
+        {devotionals?.occasionDevotional && (
+          <DevotionalCard
+            devotional={devotionals.occasionDevotional}
+            label="For today's occasion"
+          />
+        )}
+        {devotionals?.kumayl &&
+          isThursdayEvening(new Date(), prayerTimes?.maghrib ?? null) && (
+            <DevotionalCard
+              devotional={devotionals.kumayl}
+              label="Thursday evening · Laylat al-Jumu'ah"
+            />
+          )}
+
         {/* Audio + Share + Bookmark row */}
         <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 8, marginBottom: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
           <TouchableOpacity style={[styles.actionBtn, { borderColor: theme.border }]} onPress={toggleAudio} activeOpacity={0.7}>
@@ -710,6 +772,18 @@ export default function HomeScreen() {
             </Text>
           )}
         </View>
+        {/* Khatmah reading plan card (only while a plan is active) */}
+        {khatmahState && (() => {
+          const progress = getKhatmahProgress(khatmahState);
+          if (!progress) return null;
+          return (
+            <KhatmahCard
+              progress={progress}
+              surahNames={khatmahSurahNames}
+              onMarkDone={handleKhatmahMarkDone}
+            />
+          );
+        })()}
         {/* Personal note & tags (stored on this device only) */}
         {ayah && (
           <NoteTagsEditor

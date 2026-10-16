@@ -2,6 +2,11 @@ import { View, Text, ScrollView, Switch, TouchableOpacity, StyleSheet, Linking, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useEffect, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
+import {
+  loadKhatmahState,
+  getKhatmahProgress,
+  type KhatmahState,
+} from '../lib/khatmah';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { useTheme } from '../lib/theme';
@@ -59,6 +64,7 @@ export default function SettingsScreen() {
   const [syncing, setSyncing] = useState(false);
   const [syncStage, setSyncStage] = useState('');
   const [streak, setStreak] = useState<StreakState | null>(null);
+  const [khatmahState, setKhatmahState] = useState<KhatmahState | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -108,6 +114,7 @@ export default function SettingsScreen() {
     useCallback(() => {
       void refreshOfflineStatus();
       void refreshAudioState();
+      loadKhatmahState().then(setKhatmahState);
     }, [refreshOfflineStatus, refreshAudioState])
   );
 
@@ -451,6 +458,27 @@ export default function SettingsScreen() {
             : `${WELCOME_BACK_MESSAGE} Stored only on this device.`}
         </Text>
 
+        {/* READING PLAN */}
+        <Text style={s.sectionHeader}>READING PLAN</Text>
+
+        {(() => {
+          const progress = khatmahState ? getKhatmahProgress(khatmahState) : null;
+          return (
+            <TouchableOpacity style={s.row} onPress={() => router.push('/khatmah' as any)}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={s.rowLabel}>Khatmah — complete reading of the Quran</Text>
+                <Text style={{ fontFamily: 'Amiri_400Regular', fontSize: 12, color: theme.textSecondary, marginTop: 3 }}>
+                  {progress
+                    ? progress.isComplete
+                      ? `${progress.plan.name} · Completed`
+                      : `${progress.plan.name} · ${progress.completedCount} of ${progress.totalPortions} portions read`
+                    : 'No plan started · Choose a 30-day, 90-day, or one-year pace'}
+                </Text>
+              </View>
+              <Text style={s.rowLink}>Open →</Text>
+            </TouchableOpacity>
+          );
+        })()}
         {/* FAMILY CIRCLE */}
         <Text style={s.sectionHeader}>FAMILY CIRCLE</Text>
 
