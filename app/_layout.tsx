@@ -74,6 +74,15 @@ export default function RootLayout() {
           }}
         />
         <Tabs.Screen
+          name="search"
+          options={{
+            title: 'Search',
+            tabBarIcon: ({ color }) => (
+              <Text style={{ fontSize: 18, color }}>🔍</Text>
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="about"
           options={{
             title: 'About',
@@ -92,6 +101,7 @@ export default function RootLayout() {
           }}
         />
         <Tabs.Screen name="onboarding" options={{ href: null }} />
+        <Tabs.Screen name="ayah/[surah]/[ayah]" options={{ href: null }} />
       </Tabs>
     </SafeAreaProvider>
   );
