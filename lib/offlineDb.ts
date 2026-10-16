@@ -64,6 +64,7 @@ export function getOfflineDb(): Promise<SQLite.SQLiteDatabase | null> {
       try {
         const db = await SQLite.openDatabaseAsync(DB_NAME);
         await db.execAsync(SCHEMA_SQL);
+        await migrateTafsirReviewColumns(db);
         return db;
       } catch {
         return null;
@@ -71,6 +72,27 @@ export function getOfflineDb(): Promise<SQLite.SQLiteDatabase | null> {
     })();
   }
   return dbPromise;
+}
+
+/**
+ * The review columns (web migration 013) were added to the local tafsir
+ * table after the offline store first shipped, so databases created by an
+ * older build need them added in place. Rows without a review_status are
+ * treated as 'pending' by the UI — the honest default.
+ */
+async function migrateTafsirReviewColumns(db: SQLite.SQLiteDatabase): Promise<void> {
+  try {
+    const cols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(tafsir)');
+    const names = new Set(cols.map((c) => c.name));
+    for (const col of ['review_status', 'reviewed_by', 'reviewed_at']) {
+      if (!names.has(col)) {
+        await db.execAsync(`ALTER TABLE tafsir ADD COLUMN ${col} TEXT`);
+      }
+    }
+  } catch {
+    // A failed local migration must never break the app; the columns are
+    // re-checked on the next launch and reads degrade to "pending".
+  }
 }
 
 const SCHEMA_SQL = `
@@ -146,7 +168,10 @@ CREATE TABLE IF NOT EXISTS tafsir (
   text TEXT NOT NULL,
   source_book TEXT,
   volume TEXT,
-  created_at TEXT
+  created_at TEXT,
+  review_status TEXT,
+  reviewed_by TEXT,
+  reviewed_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_offline_tafsir_ayah ON tafsir(ayah_id);
 CREATE TABLE IF NOT EXISTS ayah_words (
@@ -169,6 +194,12 @@ interface TableSpec {
   table: string;
   label: string;
   columns: string[];
+  /**
+   * Columns that only exist in Supabase once a migration has run. The sync
+   * tries them first and falls back to `columns` alone if the server does
+   * not have them yet — so a pending migration never breaks offline sync.
+   */
+  optionalColumns?: string[];
   orderBy: string;
 }
 
@@ -213,6 +244,10 @@ const TABLE_SPECS: TableSpec[] = [
     table: 'tafsir',
     label: 'Reflections',
     columns: ['id', 'ayah_id', 'scholar', 'language_code', 'text', 'source_book', 'volume', 'created_at'],
+    // review_status & friends exist in Supabase only after web migration
+    // 013 runs; until then the sync falls back to the columns above and
+    // every reflection honestly reads as "pending scholarly review".
+    optionalColumns: ['review_status', 'reviewed_by', 'reviewed_at'],
     orderBy: 'id',
   },
 ];
@@ -254,6 +289,30 @@ async function fetchAllRows(spec: TableSpec, onProgress?: SyncProgress): Promise
     if (page.length < PAGE_SIZE) break;
   }
   return rows;
+}
+
+/**
+ * Fetch one table, preferring the spec's full column set (base + optional).
+ * If the server rejects the optional columns (migration not run yet), retry
+ * once with the base columns only and report the effective spec so inserts
+ * use exactly the columns that were fetched.
+ */
+async function fetchTableRows(
+  spec: TableSpec,
+  onProgress?: SyncProgress,
+): Promise<{ spec: TableSpec; rows: Row[] }> {
+  if (!spec.optionalColumns?.length) {
+    return { spec, rows: await fetchAllRows(spec, onProgress) };
+  }
+  const fullSpec: TableSpec = {
+    ...spec,
+    columns: [...spec.columns, ...spec.optionalColumns],
+  };
+  try {
+    return { spec: fullSpec, rows: await fetchAllRows(fullSpec, onProgress) };
+  } catch {
+    return { spec, rows: await fetchAllRows(spec, onProgress) };
+  }
 }
 
 async function insertRows(db: SQLite.SQLiteDatabase, spec: TableSpec, rows: Row[]): Promise<void> {
@@ -305,8 +364,11 @@ export function syncOfflineData(
       // Fetch everything first; the local store is only replaced once all
       // data has arrived, so a failed sync never destroys a good copy.
       const fetched = new Map<string, Row[]>();
+      const effectiveSpecs = new Map<string, TableSpec>();
       for (const spec of TABLE_SPECS) {
-        fetched.set(spec.table, await fetchAllRows(spec, options.onProgress));
+        const result = await fetchTableRows(spec, options.onProgress);
+        fetched.set(spec.table, result.rows);
+        effectiveSpecs.set(spec.table, result.spec);
       }
 
       // Word-by-word glosses, tolerantly: null means "unavailable upstream"
@@ -328,8 +390,9 @@ export function syncOfflineData(
 
       await db.withTransactionAsync(async () => {
         for (const spec of TABLE_SPECS) {
+          const effective = effectiveSpecs.get(spec.table) ?? spec;
           await db.runAsync(`DELETE FROM ${spec.table}`);
-          await insertRows(db, spec, fetched.get(spec.table) ?? []);
+          await insertRows(db, effective, fetched.get(spec.table) ?? []);
         }
         if (wordRows !== null) {
           await db.runAsync(`DELETE FROM ayah_words`);
