@@ -5,6 +5,7 @@ import {
   ensureOfflineData,
   isOfflineStale,
   localGetAyah,
+  localGetAyahWords,
   localGetDefaultTranslation,
   localGetLiveLanguages,
   localGetRecentSchedule,
@@ -338,6 +339,62 @@ export async function searchAyahs(rawQuery: string, page = 1) {
     totalPages,
     results,
   };
+}
+
+// ---------- Word-by-word (lexical glosses) ----------
+
+/**
+ * One word of an ayah with its LEXICAL gloss (dictionary meaning of that
+ * single word) and transliteration, from the ayah_words table (Quran.com
+ * API v4 word data, loaded by tathirquran-web/scripts/load_ayah_words.js).
+ * NOT tafsir/commentary and NOT a verse translation.
+ */
+export interface AyahWord {
+  id: number;
+  ayah_id: number;
+  position: number;
+  arabic_text: string;
+  transliteration: string | null;
+  translation_en: string | null;
+}
+
+function toAyahWord(r: any): AyahWord {
+  return {
+    id: r.id,
+    ayah_id: r.ayah_id,
+    position: r.position,
+    arabic_text: r.arabic_text,
+    transliteration: r.transliteration ?? null,
+    translation_en: r.translation_en ?? null,
+  };
+}
+
+/**
+ * Word-by-word glosses for one ayah, local-first like the other reads.
+ * Returns [] whenever no rows are available — including before migration
+ * 011 / the loader have run (the Supabase query errors and is swallowed) —
+ * so callers hide the word-by-word UI entirely. Never throws.
+ */
+export async function getAyahWords(ayahId: number): Promise<AyahWord[]> {
+  try {
+    return await localFirst<AyahWord[]>(
+      async () => {
+        const rows = await localGetAyahWords(ayahId);
+        return rows.map(toAyahWord);
+      },
+      async () => {
+        const { data, error } = await supabase
+          .from('ayah_words')
+          .select('*')
+          .eq('ayah_id', ayahId)
+          .order('position');
+        if (error) return [];
+        return ((data as any[]) || []).map(toAyahWord);
+      },
+    );
+  } catch {
+    return [];
+  }
 }
 
 // ---------- Ayah detail (used by the /ayah/[surah]/[ayah] screen) ----------
