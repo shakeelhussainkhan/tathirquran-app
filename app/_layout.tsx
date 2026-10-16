@@ -121,6 +121,7 @@ export default function RootLayout() {
         <Tabs.Screen name="onboarding" options={{ href: null }} />
         <Tabs.Screen name="khatmah" options={{ href: null }} />
         <Tabs.Screen name="ayah/[surah]/[ayah]" options={{ href: null }} />
+        <Tabs.Screen name="devotional/[slug]" options={{ href: null }} />
       </Tabs>
     </SafeAreaProvider>
   );
