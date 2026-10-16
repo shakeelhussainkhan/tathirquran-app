@@ -55,8 +55,8 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "TathirQuran uses your location to calculate accurate Shia prayer times.",
-          "locationWhenInUsePermission": "TathirQuran uses your location to calculate accurate Shia prayer times."
+          "locationAlwaysAndWhenInUsePermission": "TathirQuran uses your location to calculate accurate Shia prayer times and the Qibla direction.",
+          "locationWhenInUsePermission": "TathirQuran uses your location to calculate accurate Shia prayer times and the Qibla direction."
         }
       ],
       "expo-sharing",
