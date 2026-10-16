@@ -16,6 +16,13 @@ import { Colors } from '../constants/colors';
 import { gregorianToHijri } from '../lib/utils';
 import { useTheme } from '../lib/theme';
 import { calculatePrayerTimes, formatTime } from '../lib/prayerTimes';
+import {
+  recordDailyVerseView,
+  streakLabel,
+  WELCOME_BACK_MESSAGE,
+  type StreakMilestone,
+  type StreakState,
+} from '../lib/streaks';
 
 const REFLECTION_NOTE = 'Written by the TathirQuran team to aid reflection. Not a quotation from any tafsir. Under review by scholars.';
 
@@ -56,6 +63,9 @@ export default function HomeScreen() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [sharingCard, setSharingCard] = useState(false);
   const shareCardRef = useRef<View>(null);
+  const [streak, setStreak] = useState<StreakState | null>(null);
+  const [streakMilestone, setStreakMilestone] = useState<StreakMilestone | null>(null);
+  const [streakReturned, setStreakReturned] = useState(false);
   const player = useAudioPlayer(null);
   const currentAyahId = useRef<number | null>(null);
 
@@ -65,6 +75,17 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
+    async function noteVerseViewed() {
+      // Local-day streak: recording is idempotent within a day and
+      // never throws, so it is safe on both the live and cached paths.
+      const result = await recordDailyVerseView();
+      setStreak(result.state);
+      if (result.isNewDay) {
+        setStreakMilestone(result.milestone);
+        setStreakReturned(result.returnedAfterGap);
+      }
+    }
+
     async function load() {
       const bismPref = await AsyncStorage.getItem('show_bismillah');
       setShowBismillah(bismPref !== 'false');
@@ -86,6 +107,7 @@ export default function HomeScreen() {
           setAyah(todayAyah);
           setTranslation(trans);
           setTafsirEntries(tafsir);
+          await noteVerseViewed();
           if (currentAyahId.current !== todayAyah.ayah_id) {
             Speech.stop();
             setIsSpeaking(false);
@@ -105,6 +127,7 @@ export default function HomeScreen() {
         if (cached) {
           setAyah(JSON.parse(cached));
           setOfflineMode(true);
+          await noteVerseViewed();
         }
         if (cachedTrans) {
           setTranslation(JSON.parse(cachedTrans));
@@ -327,6 +350,32 @@ export default function HomeScreen() {
         <Text style={[styles.scholar, { color: theme.bronze }]}>
           {translation?.translations?.scholar_name}
         </Text>
+
+        {/* Streak — small and gentle; milestones celebrate, misses welcome */}
+        {streak && streak.current_streak > 0 && (
+          <View style={[styles.streakBox, { borderColor: theme.border }]}>
+            <Text style={[styles.streakText, { color: theme.bronze }]}>
+              ✦ {streakLabel(streak.current_streak)}
+              {streak.longest_streak > streak.current_streak
+                ? `  ·  Longest ${streak.longest_streak}`
+                : ''}
+            </Text>
+            {streakMilestone ? (
+              <>
+                <Text style={[styles.streakMilestone, { color: theme.gold }]}>
+                  {streakMilestone.title}
+                </Text>
+                <Text style={[styles.streakMessage, { color: theme.textSecondary }]}>
+                  {streakMilestone.message}
+                </Text>
+              </>
+            ) : streakReturned ? (
+              <Text style={[styles.streakMessage, { color: theme.textSecondary }]}>
+                {WELCOME_BACK_MESSAGE}
+              </Text>
+            ) : null}
+          </View>
+        )}
 
         {/* Audio + Share + Bookmark row */}
         <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 8, marginBottom: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -570,6 +619,38 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     marginBottom: 24,
+  },
+  streakBox: {
+    borderWidth: 0.5,
+    borderRadius: 2,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginTop: -8,
+    marginBottom: 20,
+    alignItems: 'center',
+    alignSelf: 'center',
+    maxWidth: '100%',
+  },
+  streakText: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 11,
+    letterSpacing: 1.5,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+  },
+  streakMilestone: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  streakMessage: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 12,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    lineHeight: 17,
+    marginTop: 2,
   },
   actionBtn: {
     borderWidth: 0.5,
