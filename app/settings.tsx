@@ -9,6 +9,13 @@ import {
   cancelNotifications,
   getNotificationSettings,
 } from '../lib/notifications';
+import {
+  getStreakState,
+  milestoneForStreak,
+  streakLabel,
+  WELCOME_BACK_MESSAGE,
+  type StreakState,
+} from '../lib/streaks';
 
 const LANGUAGES = [
   { code: 'en', label: 'English' },
@@ -32,6 +39,7 @@ export default function SettingsScreen() {
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [notifHour, setNotifHour] = useState(7);
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
+  const [streak, setStreak] = useState<StreakState | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -52,6 +60,7 @@ export default function SettingsScreen() {
       const notif = await getNotificationSettings();
       setNotifEnabled(notif.enabled);
       setNotifHour(notif.hour);
+      setStreak(await getStreakState());
     })();
   }, []);
 
@@ -217,6 +226,50 @@ export default function SettingsScreen() {
           </View>
         )}
 
+        {/* YOUR JOURNEY — daily-verse streak (stored on this device only) */}
+        <Text style={s.sectionHeader}>YOUR JOURNEY</Text>
+
+        <View style={s.row}>
+          <Text style={s.rowLabel}>Days with the Quran</Text>
+          <Text style={s.rowValue}>{streakLabel(streak?.current_streak ?? 0)}</Text>
+        </View>
+
+        <View style={s.row}>
+          <Text style={s.rowLabel}>Current streak</Text>
+          <Text style={s.rowValue}>
+            {streak?.current_streak
+              ? `${streak.current_streak} ${streak.current_streak === 1 ? 'day' : 'days'}`
+              : '—'}
+          </Text>
+        </View>
+
+        <View style={s.row}>
+          <Text style={s.rowLabel}>Longest streak</Text>
+          <Text style={s.rowValue}>
+            {streak?.longest_streak
+              ? `${streak.longest_streak} ${streak.longest_streak === 1 ? 'day' : 'days'}`
+              : '—'}
+          </Text>
+        </View>
+
+        <View style={s.row}>
+          <Text style={s.rowLabel}>Total days viewed</Text>
+          <Text style={s.rowValue}>{streak?.viewed_dates.length ?? 0}</Text>
+        </View>
+
+        {streak && milestoneForStreak(streak.longest_streak) && (
+          <View style={s.row}>
+            <Text style={s.rowLabel}>Milestone reached</Text>
+            <Text style={s.rowValue}>{milestoneForStreak(streak.longest_streak)?.title}</Text>
+          </View>
+        )}
+
+        <Text style={s.streakNote}>
+          {streak && streak.current_streak > 0
+            ? 'One verse a day, with barakah. Stored only on this device.'
+            : `${WELCOME_BACK_MESSAGE} Stored only on this device.`}
+        </Text>
+
         {/* ABOUT */}
         <Text style={s.sectionHeader}>ABOUT</Text>
 
@@ -319,6 +372,15 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     checkmark: {
       fontSize: 14,
       color: theme.gold,
+    },
+    streakNote: {
+      fontFamily: 'Amiri_400Regular',
+      fontSize: 12,
+      fontStyle: 'italic',
+      color: theme.textSecondary,
+      lineHeight: 18,
+      paddingHorizontal: 20,
+      paddingTop: 12,
     },
     timeControl: {
       flexDirection: 'row',
