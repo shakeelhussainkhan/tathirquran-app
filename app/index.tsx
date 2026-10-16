@@ -8,6 +8,9 @@ import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import * as Speech from 'expo-speech';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
+import ShareVerseCard from '../components/ShareVerseCard';
 import { getTodayAyah, getDefaultTranslation, getLiveLanguages, getAllTafsirForAyah } from '../lib/queries';
 import { Colors } from '../constants/colors';
 import { gregorianToHijri } from '../lib/utils';
@@ -58,6 +61,8 @@ export default function HomeScreen() {
   const [prayerTimes, setPrayerTimes] = useState<any>(null);
   const [showBismillah, setShowBismillah] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [sharingCard, setSharingCard] = useState(false);
+  const shareCardRef = useRef<View>(null);
   const [streak, setStreak] = useState<StreakState | null>(null);
   const [streakMilestone, setStreakMilestone] = useState<StreakMilestone | null>(null);
   const [streakReturned, setStreakReturned] = useState(false);
@@ -173,6 +178,39 @@ export default function HomeScreen() {
     const ref = `${surahName} ${ayah?.surah_number}:${ayah?.ayah_number}`;
     const text = `"${translation?.text}"\n— ${ref}\n\nTathirQuran · tathirquran.com`;
     await Share.share({ message: text });
+  };
+
+  // Share-as-image: capture the off-screen ShareVerseCard (same design as
+  // the web /api/verse-card PNG) and hand the PNG to the OS share sheet.
+  // Falls back to the text share above if image sharing is unavailable.
+  const handleShareCard = async () => {
+    if (!ayah || sharingCard) return;
+    setSharingCard(true);
+    try {
+      if (!(await Sharing.isAvailableAsync())) {
+        await handleShare();
+        return;
+      }
+      // Let the off-screen card settle a frame before capturing it.
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      const uri = await captureRef(shareCardRef, {
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile',
+        width: 1080,
+        height: 1350,
+      });
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/png',
+        dialogTitle: 'Share this ayah',
+        UTI: 'public.png',
+      });
+    } catch (e) {
+      console.error('Share card error:', e);
+      await handleShare();
+    } finally {
+      setSharingCard(false);
+    }
   };
 
   const toggleBookmark = async () => {
@@ -349,6 +387,11 @@ export default function HomeScreen() {
           <TouchableOpacity style={[styles.actionBtn, { borderColor: theme.border }]} onPress={handleShare} activeOpacity={0.7}>
             <Text style={[styles.actionBtnText, { color: theme.bronze }]}>↑ SHARE</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, { borderColor: theme.border }]} onPress={handleShareCard} activeOpacity={0.7}>
+            <Text style={[styles.actionBtnText, { color: theme.bronze }]}>
+              {sharingCard ? 'MAKING CARD…' : '🖼 SHARE CARD'}
+            </Text>
+          </TouchableOpacity>
           <TouchableOpacity style={[styles.actionBtn, { borderColor: theme.border }]} onPress={toggleBookmark} activeOpacity={0.7}>
             <Text style={[styles.actionBtnText, { color: bookmarked ? theme.gold : theme.bronze }]}>
               {bookmarked ? '🔖 SAVED' : '🔖 SAVE'}
@@ -472,6 +515,21 @@ export default function HomeScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
+      {/* Off-screen share card — laid out (so view-shot can capture it)
+          but positioned far off-screen; never visible to the user. */}
+      {ayah && (
+        <View style={styles.offscreenCard} pointerEvents="none">
+          <ShareVerseCard
+            ref={shareCardRef}
+            arabicText={ayah.arabic_uthmani}
+            translationText={translation?.text}
+            surahName={ayah?.surahs?.name_english || 'Quran'}
+            surahNumber={ayah.surah_number}
+            ayahNumber={ayah.ayah_number}
+          />
+        </View>
+      )}
+
       <View style={[styles.goldBar, { backgroundColor: theme.bronze }]} />
     </SafeAreaView>
   );
@@ -479,6 +537,11 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  offscreenCard: {
+    position: 'absolute',
+    left: -10000,
+    top: 0,
+  },
   goldBar: { height: 4 },
   offlineBanner: {
     backgroundColor: 'rgba(139,101,32,0.12)',
