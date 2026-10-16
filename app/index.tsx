@@ -3,8 +3,8 @@ import {
   ActivityIndicator, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 import * as Speech from 'expo-speech';
 import * as Location from 'expo-location';
@@ -13,11 +13,18 @@ import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import ShareVerseCard from '../components/ShareVerseCard';
 import NoteTagsEditor from '../components/NoteTagsEditor';
-import { getTodayAyah, getDefaultTranslation, getLiveLanguages, getAllTafsirForAyah } from '../lib/queries';
+import { getTodayAyah, getDefaultTranslation, getLiveLanguages, getAllTafsirForAyah, getSurahNames } from '../lib/queries';
 import {
   splitAyahWords, nextWordToHide, nextWordToReveal,
   isMemorized as fetchIsMemorized, setMemorized as storeSetMemorized,
 } from '../lib/memorization';
+import {
+  loadKhatmahState,
+  markPortionDone,
+  getKhatmahProgress,
+  type KhatmahState,
+} from '../lib/khatmah';
+import KhatmahCard from '../components/KhatmahCard';
 import { Colors } from '../constants/colors';
 import { gregorianToHijri } from '../lib/utils';
 import { useTheme } from '../lib/theme';
@@ -75,6 +82,8 @@ export default function HomeScreen() {
   const [streak, setStreak] = useState<StreakState | null>(null);
   const [streakMilestone, setStreakMilestone] = useState<StreakMilestone | null>(null);
   const [streakReturned, setStreakReturned] = useState(false);
+  const [khatmahState, setKhatmahState] = useState<KhatmahState | null>(null);
+  const [khatmahSurahNames, setKhatmahSurahNames] = useState<string[]>([]);
   const player = useAudioPlayer(null);
   const playerStatus = useAudioPlayerStatus(player);
   const currentAyahId = useRef<number | null>(null);
@@ -169,6 +178,29 @@ export default function HomeScreen() {
     }
     load();
   }, []);
+
+  // Khatmah reading plan: refresh on focus so a portion marked read on
+  // the plan screen (or a plan just started/ended) is reflected here.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const saved = await loadKhatmahState();
+        if (cancelled) return;
+        setKhatmahState(saved);
+        if (saved) {
+          const names = await getSurahNames();
+          if (!cancelled && names.length > 0) setKhatmahSurahNames(names);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, []),
+  );
+
+  const handleKhatmahMarkDone = async (portionIndex: number) => {
+    if (!khatmahState) return;
+    setKhatmahState(await markPortionDone(khatmahState, portionIndex));
+  };
 
   // Check bookmark state when ayah loads
   useEffect(() => {
@@ -598,6 +630,18 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Khatmah reading plan card (only while a plan is active) */}
+        {khatmahState && (() => {
+          const progress = getKhatmahProgress(khatmahState);
+          if (!progress) return null;
+          return (
+            <KhatmahCard
+              progress={progress}
+              surahNames={khatmahSurahNames}
+              onMarkDone={handleKhatmahMarkDone}
+            />
+          );
+        })()}
         {/* Personal note & tags (stored on this device only) */}
         {ayah && (
           <NoteTagsEditor

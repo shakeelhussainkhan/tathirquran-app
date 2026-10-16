@@ -139,6 +139,51 @@ export async function getAllTafsirForAyah(ayahId: number, languageCode: string =
   );
 }
 
+/**
+ * English surah names from the `surahs` table, in surah order, for
+ * labelling Khatmah plan portions. Returns an array indexed by
+ * surah - 1, or an empty array when the fetch fails / the table shape
+ * is unexpected — callers fall back to the built-in name list in
+ * lib/khatmah.ts. Names are read from the rows already in Supabase;
+ * nothing is invented here.
+ */
+export async function getSurahNames(): Promise<string[]> {
+  try {
+    const { data } = await supabase.from('surahs').select('*');
+    if (!data || data.length === 0) return [];
+    const bySurah = new Map<number, string>();
+    for (const row of data as Record<string, unknown>[]) {
+      const num =
+        typeof row.surah_number === 'number'
+          ? row.surah_number
+          : typeof row.id === 'number'
+            ? row.id
+            : typeof row.number === 'number'
+              ? row.number
+              : null;
+      const name =
+        typeof row.name_english === 'string'
+          ? row.name_english
+          : typeof row.name_simple === 'string'
+            ? row.name_simple
+            : typeof row.name === 'string'
+              ? row.name
+              : null;
+      if (num !== null && name) bySurah.set(num, name);
+    }
+    if (bySurah.size === 0) return [];
+    const names: string[] = [];
+    for (let s = 1; s <= Math.max(...bySurah.keys()); s++) {
+      const n = bySurah.get(s);
+      if (!n) return []; // incomplete — let the caller use its fallback
+      names.push(n);
+    }
+    return names;
+  } catch {
+    return [];
+  }
+}
+
 export async function getRecentSchedule(limit = 30) {
   return localFirst<any[]>(
     () => localGetRecentSchedule(limit),
