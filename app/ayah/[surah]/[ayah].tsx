@@ -5,7 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getAyahDetail } from '../../../lib/queries';
+import { getAyahDetail, getAyahWords } from '../../../lib/queries';
+import WordByWord from '../../../components/WordByWord';
 import { Colors } from '../../../constants/colors';
 import { useTheme } from '../../../lib/theme';
 import NoteTagsEditor from '../../../components/NoteTagsEditor';
@@ -33,6 +34,10 @@ export default function AyahDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
+  // Word-by-word (lexical glosses): words stay [] until ayah_words has rows
+  // for this ayah — the toggle and view are then hidden entirely.
+  const [words, setWords] = useState<any[]>([]);
+  const [showWbw, setShowWbw] = useState(false);
   const [showTransliteration, setShowTransliteration] = useState(false);
 
   useEffect(() => {
@@ -61,6 +66,11 @@ export default function AyahDetailScreen() {
           const key = `bookmark_${surahNumber}_${ayahNumber}`;
           const existing = await AsyncStorage.getItem(key);
           if (!cancelled) setBookmarked(!!existing);
+          // Word-by-word preference (default off) + glosses for this ayah.
+          const pref = await AsyncStorage.getItem('show_word_by_word');
+          if (!cancelled) setShowWbw(pref === 'true');
+          const ws = await getAyahWords(data.ayah.ayah_id);
+          if (!cancelled) setWords(ws);
         }
       } catch {
         if (!cancelled) setNotFound(true);
@@ -72,6 +82,12 @@ export default function AyahDetailScreen() {
       cancelled = true;
     };
   }, [surahNumber, ayahNumber]);
+
+  const toggleWbw = async () => {
+    const next = !showWbw;
+    setShowWbw(next);
+    await AsyncStorage.setItem('show_word_by_word', next ? 'true' : 'false');
+  };
 
   const toggleBookmark = async () => {
     if (!detail) return;
@@ -141,7 +157,22 @@ export default function AyahDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          <Text style={[styles.arabic, { color: theme.text }]}>{ayah.arabic_uthmani}</Text>
+          {words.length > 0 && (
+            <TouchableOpacity
+              onPress={toggleWbw}
+              style={[styles.wbwToggle, { borderColor: theme.gold }]}
+            >
+              <Text style={[styles.wbwToggleText, { color: theme.gold }]}>
+                WORD BY WORD {showWbw ? '▾ ON' : '▸ OFF'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {showWbw && words.length > 0 ? (
+            <WordByWord words={words} />
+          ) : (
+            <Text style={[styles.arabic, { color: theme.text }]}>{ayah.arabic_uthmani}</Text>
+          )}
 
           {/* Transliteration — phonetic transcription of the Arabic (not a
               translation). Hidden entirely until the loader populates it. */}
@@ -295,6 +326,20 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     writingDirection: 'rtl',
     marginBottom: 20,
+  },
+  wbwToggle: {
+    alignSelf: 'center',
+    borderWidth: 0.5,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+  },
+  wbwToggleText: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 10,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
   transliterationLabel: {
     fontFamily: 'Amiri_400Regular',
