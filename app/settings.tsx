@@ -1,7 +1,7 @@
 import { View, Text, ScrollView, Switch, TouchableOpacity, StyleSheet, Linking, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useEffect, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { useTheme } from '../lib/theme';
@@ -366,6 +366,19 @@ export default function SettingsScreen() {
           {streak && streak.current_streak > 0
             ? 'One verse a day, with barakah. Stored only on this device.'
             : `${WELCOME_BACK_MESSAGE} Stored only on this device.`}
+        </Text>
+
+        {/* FAMILY CIRCLE */}
+        <Text style={s.sectionHeader}>FAMILY CIRCLE</Text>
+
+        <TouchableOpacity style={s.row} onPress={() => router.push('/circles')}>
+          <Text style={s.rowLabel}>Family circle</Text>
+          <Text style={s.rowLink}>Open →</Text>
+        </TouchableOpacity>
+
+        <Text style={s.streakNote}>
+          Read the daily verse together with your family. No account or email —
+          your circle is shared with an invite code.
         </Text>
 
         {/* ABOUT */}
