@@ -7,6 +7,7 @@ import { Text } from 'react-native';
 import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Onboarding from './onboarding';
+import { ensureOfflineData } from '../lib/offlineDb';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -20,6 +21,9 @@ export default function RootLayout() {
     AsyncStorage.getItem('onboarding_complete').then(val => {
       setShowOnboarding(val !== 'true');
     });
+    // Offline-first: mirror the full Quran corpus locally on first launch
+    // (and refresh it when stale). Fire-and-forget — never blocks launch.
+    void ensureOfflineData();
   }, []);
 
   if (!fontsLoaded || showOnboarding === null) return null;
@@ -70,6 +74,15 @@ export default function RootLayout() {
           }}
         />
         <Tabs.Screen
+          name="search"
+          options={{
+            title: 'Search',
+            tabBarIcon: ({ color }) => (
+              <Text style={{ fontSize: 18, color }}>🔍</Text>
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="about"
           options={{
             title: 'About',
@@ -88,6 +101,7 @@ export default function RootLayout() {
           }}
         />
         <Tabs.Screen name="onboarding" options={{ href: null }} />
+        <Tabs.Screen name="ayah/[surah]/[ayah]" options={{ href: null }} />
       </Tabs>
     </SafeAreaProvider>
   );

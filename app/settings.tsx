@@ -1,6 +1,7 @@
-import { View, Text, ScrollView, Switch, TouchableOpacity, StyleSheet, Linking } from 'react-native';
+import { View, Text, ScrollView, Switch, TouchableOpacity, StyleSheet, Linking, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { useTheme } from '../lib/theme';
@@ -9,6 +10,14 @@ import {
   cancelNotifications,
   getNotificationSettings,
 } from '../lib/notifications';
+import { getOfflineSyncStatus, syncOfflineData, type OfflineSyncStatus } from '../lib/offlineDb';
+import {
+  getStreakState,
+  milestoneForStreak,
+  streakLabel,
+  WELCOME_BACK_MESSAGE,
+  type StreakState,
+} from '../lib/streaks';
 
 const LANGUAGES = [
   { code: 'en', label: 'English' },
@@ -32,6 +41,10 @@ export default function SettingsScreen() {
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [notifHour, setNotifHour] = useState(7);
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
+  const [offlineStatus, setOfflineStatus] = useState<OfflineSyncStatus | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncStage, setSyncStage] = useState('');
+  const [streak, setStreak] = useState<StreakState | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -52,8 +65,40 @@ export default function SettingsScreen() {
       const notif = await getNotificationSettings();
       setNotifEnabled(notif.enabled);
       setNotifHour(notif.hour);
+      setStreak(await getStreakState());
     })();
   }, []);
+
+  const refreshOfflineStatus = useCallback(async () => {
+    try {
+      setOfflineStatus(await getOfflineSyncStatus());
+    } catch {
+      // Status display is best-effort only.
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshOfflineStatus();
+    }, [refreshOfflineStatus])
+  );
+
+  const handleOfflineSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    setSyncStage('Starting…');
+    try {
+      const status = await syncOfflineData({
+        force: true,
+        onProgress: (stage, rows) => setSyncStage(`${stage} · ${rows.toLocaleString()} rows`),
+      });
+      setOfflineStatus(status);
+    } finally {
+      setSyncing(false);
+      setSyncStage('');
+      void refreshOfflineStatus();
+    }
+  };
 
   const saveLang = async (code: string) => {
     setLanguage(code);
@@ -217,6 +262,94 @@ export default function SettingsScreen() {
           </View>
         )}
 
+        {/* OFFLINE */}
+        <Text style={s.sectionHeader}>OFFLINE DATA</Text>
+
+        <View style={s.row}>
+          <Text style={s.rowLabel}>Offline data</Text>
+          <Text style={s.rowValue}>
+            {syncing
+              ? 'Syncing…'
+              : offlineStatus && offlineStatus.ayahCount > 0
+                ? '✓ Ready'
+                : 'Not downloaded'}
+          </Text>
+        </View>
+
+        {offlineStatus?.lastSyncedAt && (
+          <View style={s.row}>
+            <Text style={s.rowLabel}>Last synced</Text>
+            <Text style={s.rowValue}>
+              {new Date(offlineStatus.lastSyncedAt).toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              })}
+            </Text>
+          </View>
+        )}
+
+        <TouchableOpacity style={s.row} onPress={handleOfflineSync} disabled={syncing}>
+          <Text style={s.rowLabel}>
+            {offlineStatus && offlineStatus.ayahCount > 0 ? 'Re-sync offline data' : 'Download offline data'}
+          </Text>
+          {syncing ? (
+            <ActivityIndicator size="small" color={theme.gold} />
+          ) : (
+            <Text style={s.rowLink}>Sync now</Text>
+          )}
+        </TouchableOpacity>
+
+        <Text style={s.syncNote}>
+          {syncing && syncStage
+            ? syncStage
+            : 'Downloads the full Quran text, all translations and the daily schedule so the app works without a connection.'}
+        </Text>
+
+        {/* YOUR JOURNEY — daily-verse streak (stored on this device only) */}
+        <Text style={s.sectionHeader}>YOUR JOURNEY</Text>
+
+        <View style={s.row}>
+          <Text style={s.rowLabel}>Days with the Quran</Text>
+          <Text style={s.rowValue}>{streakLabel(streak?.current_streak ?? 0)}</Text>
+        </View>
+
+        <View style={s.row}>
+          <Text style={s.rowLabel}>Current streak</Text>
+          <Text style={s.rowValue}>
+            {streak?.current_streak
+              ? `${streak.current_streak} ${streak.current_streak === 1 ? 'day' : 'days'}`
+              : '—'}
+          </Text>
+        </View>
+
+        <View style={s.row}>
+          <Text style={s.rowLabel}>Longest streak</Text>
+          <Text style={s.rowValue}>
+            {streak?.longest_streak
+              ? `${streak.longest_streak} ${streak.longest_streak === 1 ? 'day' : 'days'}`
+              : '—'}
+          </Text>
+        </View>
+
+        <View style={s.row}>
+          <Text style={s.rowLabel}>Total days viewed</Text>
+          <Text style={s.rowValue}>{streak?.viewed_dates.length ?? 0}</Text>
+        </View>
+
+        {streak && milestoneForStreak(streak.longest_streak) && (
+          <View style={s.row}>
+            <Text style={s.rowLabel}>Milestone reached</Text>
+            <Text style={s.rowValue}>{milestoneForStreak(streak.longest_streak)?.title}</Text>
+          </View>
+        )}
+
+        <Text style={s.streakNote}>
+          {streak && streak.current_streak > 0
+            ? 'One verse a day, with barakah. Stored only on this device.'
+            : `${WELCOME_BACK_MESSAGE} Stored only on this device.`}
+        </Text>
+
         {/* ABOUT */}
         <Text style={s.sectionHeader}>ABOUT</Text>
 
@@ -320,6 +453,15 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
       fontSize: 14,
       color: theme.gold,
     },
+    streakNote: {
+      fontFamily: 'Amiri_400Regular',
+      fontSize: 12,
+      fontStyle: 'italic',
+      color: theme.textSecondary,
+      lineHeight: 18,
+      paddingHorizontal: 20,
+      paddingTop: 12,
+    },
     timeControl: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -344,6 +486,15 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
       color: theme.text,
       minWidth: 80,
       textAlign: 'center',
+    },
+    syncNote: {
+      fontFamily: 'Amiri_400Regular',
+      fontSize: 11,
+      color: theme.textSecondary,
+      paddingHorizontal: 20,
+      paddingTop: 10,
+      lineHeight: 16,
+      opacity: 0.8,
     },
     credits: {
       paddingVertical: 32,
