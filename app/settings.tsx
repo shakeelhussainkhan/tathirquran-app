@@ -1,6 +1,7 @@
-import { View, Text, ScrollView, Switch, TouchableOpacity, StyleSheet, Linking } from 'react-native';
+import { View, Text, ScrollView, Switch, TouchableOpacity, StyleSheet, Linking, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { useTheme } from '../lib/theme';
@@ -9,6 +10,7 @@ import {
   cancelNotifications,
   getNotificationSettings,
 } from '../lib/notifications';
+import { getOfflineSyncStatus, syncOfflineData, type OfflineSyncStatus } from '../lib/offlineDb';
 
 const LANGUAGES = [
   { code: 'en', label: 'English' },
@@ -32,6 +34,9 @@ export default function SettingsScreen() {
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [notifHour, setNotifHour] = useState(7);
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
+  const [offlineStatus, setOfflineStatus] = useState<OfflineSyncStatus | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncStage, setSyncStage] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -54,6 +59,37 @@ export default function SettingsScreen() {
       setNotifHour(notif.hour);
     })();
   }, []);
+
+  const refreshOfflineStatus = useCallback(async () => {
+    try {
+      setOfflineStatus(await getOfflineSyncStatus());
+    } catch {
+      // Status display is best-effort only.
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshOfflineStatus();
+    }, [refreshOfflineStatus])
+  );
+
+  const handleOfflineSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    setSyncStage('Starting…');
+    try {
+      const status = await syncOfflineData({
+        force: true,
+        onProgress: (stage, rows) => setSyncStage(`${stage} · ${rows.toLocaleString()} rows`),
+      });
+      setOfflineStatus(status);
+    } finally {
+      setSyncing(false);
+      setSyncStage('');
+      void refreshOfflineStatus();
+    }
+  };
 
   const saveLang = async (code: string) => {
     setLanguage(code);
@@ -217,6 +253,50 @@ export default function SettingsScreen() {
           </View>
         )}
 
+        {/* OFFLINE */}
+        <Text style={s.sectionHeader}>OFFLINE DATA</Text>
+
+        <View style={s.row}>
+          <Text style={s.rowLabel}>Offline data</Text>
+          <Text style={s.rowValue}>
+            {syncing
+              ? 'Syncing…'
+              : offlineStatus && offlineStatus.ayahCount > 0
+                ? '✓ Ready'
+                : 'Not downloaded'}
+          </Text>
+        </View>
+
+        {offlineStatus?.lastSyncedAt && (
+          <View style={s.row}>
+            <Text style={s.rowLabel}>Last synced</Text>
+            <Text style={s.rowValue}>
+              {new Date(offlineStatus.lastSyncedAt).toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+              })}
+            </Text>
+          </View>
+        )}
+
+        <TouchableOpacity style={s.row} onPress={handleOfflineSync} disabled={syncing}>
+          <Text style={s.rowLabel}>
+            {offlineStatus && offlineStatus.ayahCount > 0 ? 'Re-sync offline data' : 'Download offline data'}
+          </Text>
+          {syncing ? (
+            <ActivityIndicator size="small" color={theme.gold} />
+          ) : (
+            <Text style={s.rowLink}>Sync now</Text>
+          )}
+        </TouchableOpacity>
+
+        <Text style={s.syncNote}>
+          {syncing && syncStage
+            ? syncStage
+            : 'Downloads the full Quran text, all translations and the daily schedule so the app works without a connection.'}
+        </Text>
+
         {/* ABOUT */}
         <Text style={s.sectionHeader}>ABOUT</Text>
 
@@ -344,6 +424,15 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
       color: theme.text,
       minWidth: 80,
       textAlign: 'center',
+    },
+    syncNote: {
+      fontFamily: 'Amiri_400Regular',
+      fontSize: 11,
+      color: theme.textSecondary,
+      paddingHorizontal: 20,
+      paddingTop: 10,
+      lineHeight: 16,
+      opacity: 0.8,
     },
     credits: {
       paddingVertical: 32,
