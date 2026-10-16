@@ -467,6 +467,17 @@ export default function HomeScreen() {
               const config = SCHOLAR_CONFIG[scholar];
               const entries = grouped[scholar];
               const isOpen = openSections[scholar];
+              // Honest labelling: a Reflection keeps the "pending scholarly
+              // review" label until a human reviewer has approved EVERY
+              // entry in this group (web migration 013). A missing
+              // review_status — the column does not exist until the
+              // migration runs, and older offline copies do not carry it —
+              // counts as pending.
+              const headingLabel =
+                scholar === 'Reflection' &&
+                entries.every((e: any) => e.review_status === 'approved')
+                  ? 'Reflection'
+                  : config?.label || scholar;
               const allText = entries.map(e => e.text).join(' ');
               return (
                 <View key={scholar} style={{ marginBottom: 6 }}>
@@ -477,7 +488,7 @@ export default function HomeScreen() {
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.tafsirBtnText, { color: theme.bronze }]}>
-                        {config?.label || scholar}
+                        {headingLabel}
                       </Text>
                       {config?.sublabel && (
                         <Text style={styles.tafsirBtnSublabel}>
