@@ -5,6 +5,7 @@ import {
   ensureOfflineData,
   isOfflineStale,
   localGetAyah,
+  localGetAyahWords,
   localGetDefaultTranslation,
   localGetLiveLanguages,
   localGetRecentSchedule,
@@ -137,6 +138,51 @@ export async function getAllTafsirForAyah(ayahId: number, languageCode: string =
       return data || [];
     },
   );
+}
+
+/**
+ * English surah names from the `surahs` table, in surah order, for
+ * labelling Khatmah plan portions. Returns an array indexed by
+ * surah - 1, or an empty array when the fetch fails / the table shape
+ * is unexpected — callers fall back to the built-in name list in
+ * lib/khatmah.ts. Names are read from the rows already in Supabase;
+ * nothing is invented here.
+ */
+export async function getSurahNames(): Promise<string[]> {
+  try {
+    const { data } = await supabase.from('surahs').select('*');
+    if (!data || data.length === 0) return [];
+    const bySurah = new Map<number, string>();
+    for (const row of data as Record<string, unknown>[]) {
+      const num =
+        typeof row.surah_number === 'number'
+          ? row.surah_number
+          : typeof row.id === 'number'
+            ? row.id
+            : typeof row.number === 'number'
+              ? row.number
+              : null;
+      const name =
+        typeof row.name_english === 'string'
+          ? row.name_english
+          : typeof row.name_simple === 'string'
+            ? row.name_simple
+            : typeof row.name === 'string'
+              ? row.name
+              : null;
+      if (num !== null && name) bySurah.set(num, name);
+    }
+    if (bySurah.size === 0) return [];
+    const names: string[] = [];
+    for (let s = 1; s <= Math.max(...bySurah.keys()); s++) {
+      const n = bySurah.get(s);
+      if (!n) return []; // incomplete — let the caller use its fallback
+      names.push(n);
+    }
+    return names;
+  } catch {
+    return [];
+  }
 }
 
 export async function getRecentSchedule(limit = 30) {
@@ -338,6 +384,62 @@ export async function searchAyahs(rawQuery: string, page = 1) {
     totalPages,
     results,
   };
+}
+
+// ---------- Word-by-word (lexical glosses) ----------
+
+/**
+ * One word of an ayah with its LEXICAL gloss (dictionary meaning of that
+ * single word) and transliteration, from the ayah_words table (Quran.com
+ * API v4 word data, loaded by tathirquran-web/scripts/load_ayah_words.js).
+ * NOT tafsir/commentary and NOT a verse translation.
+ */
+export interface AyahWord {
+  id: number;
+  ayah_id: number;
+  position: number;
+  arabic_text: string;
+  transliteration: string | null;
+  translation_en: string | null;
+}
+
+function toAyahWord(r: any): AyahWord {
+  return {
+    id: r.id,
+    ayah_id: r.ayah_id,
+    position: r.position,
+    arabic_text: r.arabic_text,
+    transliteration: r.transliteration ?? null,
+    translation_en: r.translation_en ?? null,
+  };
+}
+
+/**
+ * Word-by-word glosses for one ayah, local-first like the other reads.
+ * Returns [] whenever no rows are available — including before migration
+ * 011 / the loader have run (the Supabase query errors and is swallowed) —
+ * so callers hide the word-by-word UI entirely. Never throws.
+ */
+export async function getAyahWords(ayahId: number): Promise<AyahWord[]> {
+  try {
+    return await localFirst<AyahWord[]>(
+      async () => {
+        const rows = await localGetAyahWords(ayahId);
+        return rows.map(toAyahWord);
+      },
+      async () => {
+        const { data, error } = await supabase
+          .from('ayah_words')
+          .select('*')
+          .eq('ayah_id', ayahId)
+          .order('position');
+        if (error) return [];
+        return ((data as any[]) || []).map(toAyahWord);
+      },
+    );
+  } catch {
+    return [];
+  }
 }
 
 // ---------- Ayah detail (used by the /ayah/[surah]/[ayah] screen) ----------
