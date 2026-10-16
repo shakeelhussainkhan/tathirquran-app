@@ -83,6 +83,15 @@ export default function RootLayout() {
           }}
         />
         <Tabs.Screen
+          name="circles"
+          options={{
+            title: 'Circle',
+            tabBarIcon: ({ color }) => (
+              <Text style={{ fontSize: 18, color }}>👥</Text>
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="qibla"
           options={{
             title: 'Qibla',
