@@ -24,6 +24,7 @@ import {
   type StreakMilestone,
   type StreakState,
 } from '../lib/streaks';
+import { maybeCheckInToCircle } from '../lib/circles';
 
 const REFLECTION_NOTE = 'Written by the TathirQuran team to aid reflection. Not a quotation from any tafsir. Under review by scholars.';
 
@@ -82,6 +83,11 @@ export default function HomeScreen() {
       // never throws, so it is safe on both the live and cached paths.
       const result = await recordDailyVerseView();
       setStreak(result.state);
+      // Family circle check-in: if this device is in a circle, tell the
+      // circle today's verse was opened (local date). Fire-and-forget —
+      // it never throws and a failure is silent, so reading the verse
+      // never depends on the circle service being up.
+      void maybeCheckInToCircle();
       if (result.isNewDay) {
         setStreakMilestone(result.milestone);
         setStreakReturned(result.returnedAfterGap);
@@ -452,6 +458,18 @@ export default function HomeScreen() {
         >
           <Text style={[styles.tafsirBtnText, { color: theme.bronze, flex: 1 }]}>
             🧭 QIBLA DIRECTION
+          </Text>
+          <Text style={[styles.tafsirChevron, { color: theme.bronze }]}>→</Text>
+        </TouchableOpacity>
+
+        {/* Family circle entry point */}
+        <TouchableOpacity
+          style={[styles.tafsirBtn, { borderColor: theme.border, marginTop: 10 }]}
+          onPress={() => router.push('/circles')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tafsirBtnText, { color: theme.bronze, flex: 1 }]}>
+            👥 FAMILY CIRCLE
           </Text>
           <Text style={[styles.tafsirChevron, { color: theme.bronze }]}>→</Text>
         </TouchableOpacity>
