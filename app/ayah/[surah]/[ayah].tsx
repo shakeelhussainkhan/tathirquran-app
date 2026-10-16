@@ -33,6 +33,13 @@ export default function AyahDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
+  const [showTransliteration, setShowTransliteration] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem('show_transliteration').then((v) => {
+      setShowTransliteration(v === 'true');
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,6 +142,15 @@ export default function AyahDetailScreen() {
           </View>
 
           <Text style={[styles.arabic, { color: theme.text }]}>{ayah.arabic_uthmani}</Text>
+
+          {/* Transliteration — phonetic transcription of the Arabic (not a
+              translation). Hidden entirely until the loader populates it. */}
+          {showTransliteration && ayah.transliteration ? (
+            <>
+              <Text style={[styles.transliterationLabel, { color: theme.bronze }]}>TRANSLITERATION</Text>
+              <Text style={[styles.transliteration, { color: theme.textSecondary }]}>{ayah.transliteration}</Text>
+            </>
+          ) : null}
 
           <View style={styles.ornament}>
             <View style={[styles.ornamentLine, { backgroundColor: theme.border }]} />
@@ -277,6 +293,22 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     writingDirection: 'rtl',
     marginBottom: 20,
+  },
+  transliterationLabel: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 11,
+    letterSpacing: 2,
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  transliteration: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 17,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    lineHeight: 26,
+    marginBottom: 16,
+    paddingHorizontal: 8,
   },
   ornament: {
     flexDirection: 'row',
