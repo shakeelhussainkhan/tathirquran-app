@@ -5,14 +5,19 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 import * as Speech from 'expo-speech';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import ShareVerseCard from '../components/ShareVerseCard';
+import NoteTagsEditor from '../components/NoteTagsEditor';
 import { getTodayAyah, getDefaultTranslation, getLiveLanguages, getAllTafsirForAyah } from '../lib/queries';
+import {
+  splitAyahWords, nextWordToHide, nextWordToReveal,
+  isMemorized as fetchIsMemorized, setMemorized as storeSetMemorized,
+} from '../lib/memorization';
 import { Colors } from '../constants/colors';
 import { gregorianToHijri } from '../lib/utils';
 import { useTheme } from '../lib/theme';
@@ -26,6 +31,7 @@ import {
   type StreakMilestone,
   type StreakState,
 } from '../lib/streaks';
+import { maybeCheckInToCircle } from '../lib/circles';
 
 const REFLECTION_NOTE = 'Written by the TathirQuran team to aid reflection. Not a quotation from any tafsir. Under review by scholars.';
 
@@ -64,6 +70,7 @@ export default function HomeScreen() {
   const [bookmarked, setBookmarked] = useState(false);
   const [prayerTimes, setPrayerTimes] = useState<any>(null);
   const [showBismillah, setShowBismillah] = useState(true);
+  const [showTransliteration, setShowTransliteration] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [sharingCard, setSharingCard] = useState(false);
   const shareCardRef = useRef<View>(null);
@@ -72,7 +79,22 @@ export default function HomeScreen() {
   const [streakMilestone, setStreakMilestone] = useState<StreakMilestone | null>(null);
   const [streakReturned, setStreakReturned] = useState(false);
   const player = useAudioPlayer(null);
+  const playerStatus = useAudioPlayerStatus(player);
   const currentAyahId = useRef<number | null>(null);
+
+  // ── Memorization mode ──────────────────────────────────────────────
+  // Display-only: it hides/reveals the translation and the Arabic words
+  // of the ayah already loaded above. No new content is introduced.
+  const [memorizeMode, setMemorizeMode] = useState(false);
+  const [translationHidden, setTranslationHidden] = useState(false);
+  const [hiddenWords, setHiddenWords] = useState<Set<number>>(new Set());
+  const [memorized, setMemorized] = useState(false);
+  // Repeat-audio loop (uses the same recitation player as LISTEN)
+  const LOOP_COUNTS = [1, 3, 5, 10];
+  const [loopCount, setLoopCount] = useState(3);
+  const [loopActive, setLoopActive] = useState(false);
+  const [loopPlaysDone, setLoopPlaysDone] = useState(0);
+  const loopRef = useRef<{ active: boolean; target: number; done: number }>({ active: false, target: 0, done: 0 });
 
   // Stop TTS on unmount
   useEffect(() => {
@@ -85,6 +107,11 @@ export default function HomeScreen() {
       // never throws, so it is safe on both the live and cached paths.
       const result = await recordDailyVerseView();
       setStreak(result.state);
+      // Family circle check-in: if this device is in a circle, tell the
+      // circle today's verse was opened (local date). Fire-and-forget —
+      // it never throws and a failure is silent, so reading the verse
+      // never depends on the circle service being up.
+      void maybeCheckInToCircle();
       if (result.isNewDay) {
         setStreakMilestone(result.milestone);
         setStreakReturned(result.returnedAfterGap);
@@ -94,6 +121,9 @@ export default function HomeScreen() {
     async function load() {
       const bismPref = await AsyncStorage.getItem('show_bismillah');
       setShowBismillah(bismPref !== 'false');
+
+      const translitPref = await AsyncStorage.getItem('show_transliteration');
+      setShowTransliteration(translitPref === 'true');
 
       const savedLang = await AsyncStorage.getItem('selected_language');
       const lang = savedLang || 'en';
@@ -162,6 +192,18 @@ export default function HomeScreen() {
       }
     })();
   }, []);
+
+  // Check memorized state and reset memorization display when ayah changes
+  useEffect(() => {
+    if (ayah) {
+      fetchIsMemorized(ayah.surah_number, ayah.ayah_number).then(setMemorized);
+      setHiddenWords(new Set());
+      setTranslationHidden(false);
+      loopRef.current.active = false;
+      setLoopActive(false);
+      setLoopPlaysDone(0);
+    }
+  }, [ayah]);
 
   // Fetch prayer times
   useEffect(() => {
@@ -268,7 +310,120 @@ export default function HomeScreen() {
     });
   };
 
+  const ayahAudioUrl = () => {
+    const surahStr = String(ayah?.surah_number || 1).padStart(3, '0');
+    const ayahStr = String(ayah?.ayah_number || 1).padStart(3, '0');
+    return `https://everyayah.com/data/Husary_128kbps/${surahStr}${ayahStr}.mp3`;
+  };
+
+  // ── Repeat-audio loop (memorization) ───────────────────────────────
+  const stopLoop = () => {
+    loopRef.current.active = false;
+    setLoopActive(false);
+    try { player.pause(); } catch { /* player may not be loaded */ }
+  };
+
+  const startLoop = async () => {
+    if (!ayah) return;
+    Speech.stop();
+    setIsSpeaking(false);
+    try {
+      setAudioLoading(true);
+      await setAudioModeAsync({ playsInSilentMode: true });
+      player.replace({ uri: ayahAudioUrl() });
+      loopRef.current = { active: true, target: loopCount, done: 0 };
+      setLoopPlaysDone(0);
+      setLoopActive(true);
+      player.play();
+      setAudioLoading(false);
+    } catch (e) {
+      console.error('Audio loop error:', e);
+      loopRef.current.active = false;
+      setLoopActive(false);
+      setAudioLoading(false);
+    }
+  };
+
+  // Count completed plays; replay from the start until the chosen
+  // repeat count is reached, then stop on its own.
+  useEffect(() => {
+    if (!playerStatus.didJustFinish) return;
+    const loop = loopRef.current;
+    if (!loop.active) return;
+    const done = loop.done + 1;
+    loop.done = done;
+    setLoopPlaysDone(done);
+    if (done < loop.target) {
+      try {
+        player.seekTo(0);
+        player.play();
+      } catch { /* ignore */ }
+    } else {
+      loop.active = false;
+      setLoopActive(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerStatus.didJustFinish]);
+
+  // ── Memorization display controls ──────────────────────────────────
+  const ayahWords = splitAyahWords(ayah?.arabic_uthmani);
+
+  const toggleMemorizeMode = () => {
+    if (memorizeMode) {
+      // Leaving memorize mode restores the full ayah.
+      setMemorizeMode(false);
+      setTranslationHidden(false);
+      setHiddenWords(new Set());
+      stopLoop();
+    } else {
+      setMemorizeMode(true);
+      // Progressive reveal, step one: the translation goes first.
+      setTranslationHidden(true);
+      setHiddenWords(new Set());
+    }
+  };
+
+  const hideNextWord = () => {
+    const idx = nextWordToHide(ayahWords.length, hiddenWords);
+    if (idx === null) return;
+    setHiddenWords(prev => new Set(prev).add(idx));
+  };
+
+  const revealNextWord = () => {
+    const idx = nextWordToReveal(hiddenWords);
+    if (idx === null) return;
+    setHiddenWords(prev => {
+      const next = new Set(prev);
+      next.delete(idx);
+      return next;
+    });
+  };
+
+  const revealWord = (idx: number) => {
+    setHiddenWords(prev => {
+      if (!prev.has(idx)) return prev;
+      const next = new Set(prev);
+      next.delete(idx);
+      return next;
+    });
+  };
+
+  const toggleMemorized = async () => {
+    if (!ayah) return;
+    const next = !memorized;
+    await storeSetMemorized({
+      surah: ayah.surah_number,
+      ayah: ayah.ayah_number,
+      surahName: ayah.surahs?.name_english,
+      arabic: ayah.arabic_uthmani,
+      translation: translation?.text,
+    }, next);
+    setMemorized(next);
+  };
+
   const toggleAudio = async () => {
+    // A manual LISTEN press cancels any repeat loop in progress.
+    if (loopRef.current.active) stopLoop();
     // Stop TTS when Quran recitation starts
     if (!player.playing) {
       Speech.stop();
@@ -343,8 +498,33 @@ export default function HomeScreen() {
           </Text>
         )}
 
-        {/* Arabic verse */}
-        <Text style={[styles.arabic, { color: theme.text }]}>{ayah?.arabic_uthmani}</Text>
+        {/* Arabic verse — in memorize mode the exact same text is rendered
+            word-by-word (split on whitespace, unaltered) so individual
+            words can be hidden and tapped to reveal. */}
+        {memorizeMode ? (
+          <Text style={[styles.arabic, { color: theme.text }]}>
+            {ayahWords.map((word, i) => (
+              <Text
+                key={i}
+                onPress={hiddenWords.has(i) ? () => revealWord(i) : undefined}
+                style={hiddenWords.has(i) ? { color: theme.bronze } : undefined}
+              >
+                {hiddenWords.has(i) ? '••••' : word}{i < ayahWords.length - 1 ? ' ' : ''}
+              </Text>
+            ))}
+          </Text>
+        ) : (
+          <Text style={[styles.arabic, { color: theme.text }]}>{ayah?.arabic_uthmani}</Text>
+        )}
+
+        {/* Transliteration — phonetic transcription of the Arabic (not a
+            translation). Hidden entirely until the loader populates the field. */}
+        {showTransliteration && ayah?.transliteration ? (
+          <>
+            <Text style={[styles.transliterationLabel, { color: theme.bronze }]}>TRANSLITERATION</Text>
+            <Text style={[styles.transliteration, { color: theme.textSecondary }]}>{ayah.transliteration}</Text>
+          </>
+        ) : null}
 
         {/* Ornament */}
         <View style={styles.ornament}>
@@ -353,10 +533,18 @@ export default function HomeScreen() {
           <View style={[styles.ornamentLine, { backgroundColor: theme.border }]} />
         </View>
 
-        {/* Translation */}
-        <Text style={[styles.translation, { color: theme.text }]}>
-          {translation ? `"${translation.text}"` : ''}
-        </Text>
+        {/* Translation — hidden first in memorize mode (progressive reveal) */}
+        {memorizeMode && translationHidden ? (
+          <TouchableOpacity onPress={() => setTranslationHidden(false)} activeOpacity={0.7}>
+            <Text style={[styles.translation, { color: theme.textSecondary }]}>
+              Translation hidden — tap to reveal
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={[styles.translation, { color: theme.text }]}>
+            {translation ? `"${translation.text}"` : ''}
+          </Text>
+        )}
 
         {/* Reference */}
         <Text style={[styles.ref, { color: theme.gold }]}>
@@ -429,7 +617,123 @@ export default function HomeScreen() {
               {bookmarked ? '🔖 SAVED' : '🔖 SAVE'}
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, { borderColor: memorizeMode ? theme.gold : theme.border, backgroundColor: memorizeMode ? 'rgba(201,162,39,0.10)' : 'transparent' }]}
+            onPress={toggleMemorizeMode}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.actionBtnText, { color: memorizeMode ? theme.gold : theme.bronze }]}>
+              🧠 MEMORIZE
+            </Text>
+          </TouchableOpacity>
         </View>
+
+        {/* Personal note & tags (stored on this device only) */}
+        {ayah && (
+          <NoteTagsEditor
+            key={`${ayah.surah_number}_${ayah.ayah_number}`}
+            surah={ayah.surah_number}
+            ayah={ayah.ayah_number}
+            theme={theme}
+          />
+        )}
+
+        {/* Memorization panel */}
+        {memorizeMode && (
+          <View style={[styles.memorizePanel, { borderColor: theme.border }]}>
+            <Text style={[styles.memorizeTitle, { color: theme.gold }]}>MEMORIZE THIS AYAH</Text>
+            <Text style={[styles.memorizeHint, { color: theme.textSecondary }]}>
+              The translation is hidden first. Then hide the Arabic words little by little,
+              recite from memory, and tap a hidden word — or Reveal — to check yourself.
+            </Text>
+
+            {/* Step 1: translation */}
+            <TouchableOpacity
+              style={[styles.actionBtn, { borderColor: theme.border }]}
+              onPress={() => setTranslationHidden(!translationHidden)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.actionBtnText, { color: theme.bronze }]}>
+                {translationHidden ? 'SHOW TRANSLATION' : 'HIDE TRANSLATION'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Step 2: hide Arabic words incrementally */}
+            <Text style={[styles.memorizeStatus, { color: theme.textSecondary }]}>
+              {hiddenWords.size} of {ayahWords.length} words hidden
+            </Text>
+            <View style={styles.memorizeRow}>
+              <TouchableOpacity style={[styles.actionBtn, { borderColor: theme.border }]} onPress={hideNextWord} activeOpacity={0.7}>
+                <Text style={[styles.actionBtnText, { color: theme.bronze }]}>HIDE A WORD</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionBtn, { borderColor: theme.border }]} onPress={revealNextWord} activeOpacity={0.7}>
+                <Text style={[styles.actionBtnText, { color: theme.bronze }]}>REVEAL A WORD</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, { borderColor: theme.border }]}
+                onPress={() => setHiddenWords(new Set(ayahWords.map((_, i) => i)))}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.actionBtnText, { color: theme.bronze }]}>HIDE ALL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, { borderColor: theme.border }]}
+                onPress={() => setHiddenWords(new Set())}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.actionBtnText, { color: theme.bronze }]}>SHOW ALL</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Repeat-audio loop */}
+            <Text style={[styles.memorizeTitle, { color: theme.gold, marginTop: 14 }]}>REPEAT RECITATION</Text>
+            <View style={styles.memorizeRow}>
+              {LOOP_COUNTS.map(n => (
+                <TouchableOpacity
+                  key={n}
+                  style={loopCount === n
+                    ? [styles.pillActive, { backgroundColor: theme.bronze }]
+                    : [styles.pillInactive, { borderColor: theme.border }]}
+                  onPress={() => setLoopCount(n)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={loopCount === n ? styles.pillTextActive : [styles.pillTextInactive, { color: theme.textSecondary }]}>
+                    {n}×
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {loopActive ? (
+              <TouchableOpacity style={[styles.actionBtn, { borderColor: theme.gold }]} onPress={stopLoop} activeOpacity={0.7}>
+                <Text style={[styles.actionBtnText, { color: theme.gold }]}>
+                  ■ STOP — PLAYING {Math.min(loopPlaysDone + 1, loopCount)} OF {loopCount}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={[styles.actionBtn, { borderColor: theme.border }]} onPress={startLoop} activeOpacity={0.7}>
+                <Text style={[styles.actionBtnText, { color: theme.bronze }]}>
+                  {audioLoading ? 'LOADING...' : `▶ REPEAT ${loopCount}×`}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Self-check */}
+            <TouchableOpacity
+              style={[styles.actionBtn, { borderColor: memorized ? theme.gold : theme.border, marginTop: 14, backgroundColor: memorized ? 'rgba(201,162,39,0.10)' : 'transparent' }]}
+              onPress={toggleMemorized}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.actionBtnText, { color: memorized ? theme.gold : theme.bronze }]}>
+                {memorized ? '✓ MEMORIZED — TAP TO UNDO' : 'MARK AS MEMORIZED'}
+              </Text>
+            </TouchableOpacity>
+            {memorized && (
+              <Text style={[styles.memorizeHint, { color: theme.textSecondary }]}>
+                Saved on this device. Find it any time under Archive → Memorized.
+              </Text>
+            )}
+          </View>
+        )}
 
         {/* Language pills */}
         <View style={styles.langSection}>
@@ -486,6 +790,18 @@ export default function HomeScreen() {
           <Text style={[styles.tafsirChevron, { color: theme.bronze }]}>→</Text>
         </TouchableOpacity>
 
+        {/* Family circle entry point */}
+        <TouchableOpacity
+          style={[styles.tafsirBtn, { borderColor: theme.border, marginTop: 10 }]}
+          onPress={() => router.push('/circles')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tafsirBtnText, { color: theme.bronze, flex: 1 }]}>
+            👥 FAMILY CIRCLE
+          </Text>
+          <Text style={[styles.tafsirChevron, { color: theme.bronze }]}>→</Text>
+        </TouchableOpacity>
+
         {/* Tafsir */}
         {scholars.length === 0 ? (
           <View style={[styles.tafsirBtn, { borderColor: theme.border }]}>
@@ -497,6 +813,17 @@ export default function HomeScreen() {
               const config = SCHOLAR_CONFIG[scholar];
               const entries = grouped[scholar];
               const isOpen = openSections[scholar];
+              // Honest labelling: a Reflection keeps the "pending scholarly
+              // review" label until a human reviewer has approved EVERY
+              // entry in this group (web migration 013). A missing
+              // review_status — the column does not exist until the
+              // migration runs, and older offline copies do not carry it —
+              // counts as pending.
+              const headingLabel =
+                scholar === 'Reflection' &&
+                entries.every((e: any) => e.review_status === 'approved')
+                  ? 'Reflection'
+                  : config?.label || scholar;
               const allText = entries.map(e => e.text).join(' ');
               return (
                 <View key={scholar} style={{ marginBottom: 6 }}>
@@ -507,7 +834,7 @@ export default function HomeScreen() {
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.tafsirBtnText, { color: theme.bronze }]}>
-                        {config?.label || scholar}
+                        {headingLabel}
                       </Text>
                       {config?.sublabel && (
                         <Text style={styles.tafsirBtnSublabel}>
@@ -633,6 +960,23 @@ const styles = StyleSheet.create({
     lineHeight: 56,
     marginBottom: 4,
   },
+  transliterationLabel: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 11,
+    letterSpacing: 2,
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 2,
+  },
+  transliteration: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 17,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    lineHeight: 26,
+    marginBottom: 8,
+    paddingHorizontal: 8,
+  },
   ornament: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -706,6 +1050,40 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 2,
     fontFamily: 'Amiri_400Regular',
+  },
+  memorizePanel: {
+    width: '100%',
+    borderWidth: 0.5,
+    borderRadius: 4,
+    padding: 16,
+    marginBottom: 20,
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(201,162,39,0.04)',
+  },
+  memorizeTitle: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 10,
+    letterSpacing: 2,
+    textAlign: 'center',
+  },
+  memorizeHint: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  memorizeStatus: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 11,
+    letterSpacing: 1,
+  },
+  memorizeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   langSection: { width: '100%', marginBottom: 16 },
   langLabel: {
