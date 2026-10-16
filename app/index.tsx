@@ -12,6 +12,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import ShareVerseCard from '../components/ShareVerseCard';
+import ReciterPicker from '../components/ReciterPicker';
+import {
+  DEFAULT_RECITER,
+  downloadAyahAudio,
+  getSelectedReciter,
+  isAudioDownloaded,
+  resolvePlaybackUri,
+  setSelectedReciter,
+  type Reciter,
+} from '../lib/reciters';
 import NoteTagsEditor from '../components/NoteTagsEditor';
 import { getTodayAyah, getDefaultTranslation, getLiveLanguages, getAllTafsirForAyah, getSurahNames } from '../lib/queries';
 import {
@@ -85,11 +95,19 @@ export default function HomeScreen() {
   const [devotionals, setDevotionals] = useState<TodayDevotionals | null>(null);
   const [streakMilestone, setStreakMilestone] = useState<StreakMilestone | null>(null);
   const [streakReturned, setStreakReturned] = useState(false);
+  const [reciter, setReciter] = useState<Reciter>(DEFAULT_RECITER);
+  const [audioDownloaded, setAudioDownloaded] = useState(false);
+  const [downloadingAudio, setDownloadingAudio] = useState(false);
+  const [downloadFailed, setDownloadFailed] = useState(false);
   const [khatmahState, setKhatmahState] = useState<KhatmahState | null>(null);
   const [khatmahSurahNames, setKhatmahSurahNames] = useState<string[]>([]);
   const player = useAudioPlayer(null);
   const playerStatus = useAudioPlayerStatus(player);
   const currentAyahId = useRef<number | null>(null);
+  // URI currently loaded in the player. Playback only "resumes" when the
+  // desired URI (reciter + ayah + local-vs-remote) is exactly this one —
+  // otherwise switching reciter would keep playing the previous voice.
+  const loadedAudioUri = useRef<string | null>(null);
 
   // ── Memorization mode ──────────────────────────────────────────────
   // Display-only: it hides/reveals the translation and the Arabic words
@@ -128,6 +146,8 @@ export default function HomeScreen() {
     }
 
     async function load() {
+      setReciter(await getSelectedReciter());
+
       const bismPref = await AsyncStorage.getItem('show_bismillah');
       setShowBismillah(bismPref !== 'false');
 
@@ -155,6 +175,7 @@ export default function HomeScreen() {
           if (currentAyahId.current !== todayAyah.ayah_id) {
             Speech.stop();
             setIsSpeaking(false);
+            loadedAudioUri.current = null;
             currentAyahId.current = todayAyah.ayah_id;
           }
           // Cache for offline
@@ -213,6 +234,67 @@ export default function HomeScreen() {
     }
   }, [ayah]);
 
+  // Check whether this ayah is already downloaded for the selected reciter
+  useEffect(() => {
+    if (!ayah) {
+      setAudioDownloaded(false);
+      return;
+    }
+    let cancelled = false;
+    isAudioDownloaded(reciter, ayah.surah_number, ayah.ayah_number).then((present) => {
+      if (!cancelled) setAudioDownloaded(present);
+    });
+    return () => { cancelled = true; };
+  }, [ayah, reciter]);
+
+  // If the reciter was changed in Settings, pick it up when Today
+  // regains focus so both pickers always agree.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      getSelectedReciter().then((saved) => {
+        if (cancelled) return;
+        setReciter((current) => {
+          if (saved.id !== current.id) {
+            if (player.playing) player.pause();
+            loadedAudioUri.current = null;
+          }
+          return saved;
+        });
+      });
+      return () => { cancelled = true; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+  );
+
+  const handleReciterChange = async (next: Reciter) => {
+    if (next.id === reciter.id) return;
+    // The loaded track belongs to the previous reciter — stop and forget
+    // it so the next LISTEN loads the new voice instead of resuming.
+    if (player.playing) player.pause();
+    loadedAudioUri.current = null;
+    setReciter(next);
+    setDownloadFailed(false);
+    await setSelectedReciter(next);
+  };
+
+  const handleDownloadAudio = async () => {
+    if (!ayah || downloadingAudio || audioDownloaded) return;
+    setDownloadingAudio(true);
+    setDownloadFailed(false);
+    try {
+      await downloadAyahAudio(reciter, ayah.surah_number, ayah.ayah_number);
+      setAudioDownloaded(true);
+      // If the streamed copy is loaded, the next play should use the file.
+      loadedAudioUri.current = null;
+      if (player.playing) player.pause();
+    } catch (e) {
+      console.error('Audio download error:', e);
+      setDownloadFailed(true);
+    } finally {
+      setDownloadingAudio(false);
+    }
+  };
   // Devotionals (occasion duas & ziyarat): best-effort — an empty seed or
   // a missing table simply means no cards are shown. Never placeholder text.
   useEffect(() => {
@@ -466,16 +548,21 @@ export default function HomeScreen() {
         player.pause();
         return;
       }
-      if (player.duration > 0) {
+      // Playback uses the selected reciter, preferring a downloaded
+      // copy of this ayah when one is on the device.
+      const uri = await resolvePlaybackUri(
+        reciter,
+        ayah?.surah_number || 1,
+        ayah?.ayah_number || 1
+      );
+      if (loadedAudioUri.current === uri && player.duration > 0) {
         player.play();
         return;
       }
       setAudioLoading(true);
-      const surahStr = String(ayah?.surah_number || 1).padStart(3, '0');
-      const ayahStr = String(ayah?.ayah_number || 1).padStart(3, '0');
-      const url = `https://everyayah.com/data/Husary_128kbps/${surahStr}${ayahStr}.mp3`;
       await setAudioModeAsync({ playsInSilentMode: true });
-      player.replace({ uri: url });
+      player.replace({ uri });
+      loadedAudioUri.current = uri;
       player.play();
       setAudioLoading(false);
     } catch (e) {
@@ -660,6 +747,31 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Reciter — compact picker next to the audio controls */}
+        <ReciterPicker selected={reciter} onSelect={handleReciterChange} variant="chips" />
+
+        {/* Download this ayah's audio for offline listening */}
+        <View style={{ alignItems: 'center', marginTop: -4, marginBottom: 20 }}>
+          <TouchableOpacity
+            style={[styles.actionBtn, { borderColor: theme.border }]}
+            onPress={handleDownloadAudio}
+            disabled={downloadingAudio || audioDownloaded}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.actionBtnText, { color: audioDownloaded ? theme.gold : theme.bronze }]}>
+              {downloadingAudio
+                ? 'DOWNLOADING…'
+                : audioDownloaded
+                  ? '✓ DOWNLOADED — PLAYS OFFLINE'
+                  : '⬇ DOWNLOAD AUDIO'}
+            </Text>
+          </TouchableOpacity>
+          {downloadFailed && (
+            <Text style={[styles.downloadNote, { color: theme.textSecondary }]}>
+              Download failed — check your connection and try again.
+            </Text>
+          )}
+        </View>
         {/* Khatmah reading plan card (only while a plan is active) */}
         {khatmahState && (() => {
           const progress = getKhatmahProgress(khatmahState);
@@ -1094,6 +1206,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 2,
     fontFamily: 'Amiri_400Regular',
+  },
+  downloadNote: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 11,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 6,
   },
   memorizePanel: {
     width: '100%',
