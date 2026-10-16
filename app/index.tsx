@@ -17,6 +17,8 @@ import { Colors } from '../constants/colors';
 import { gregorianToHijri } from '../lib/utils';
 import { useTheme } from '../lib/theme';
 import { calculatePrayerTimes, formatTime } from '../lib/prayerTimes';
+import { getTodayDevotionals, isThursdayEvening, type TodayDevotionals } from '../lib/devotionals';
+import DevotionalCard from '../components/DevotionalCard';
 import {
   recordDailyVerseView,
   streakLabel,
@@ -66,6 +68,7 @@ export default function HomeScreen() {
   const [sharingCard, setSharingCard] = useState(false);
   const shareCardRef = useRef<View>(null);
   const [streak, setStreak] = useState<StreakState | null>(null);
+  const [devotionals, setDevotionals] = useState<TodayDevotionals | null>(null);
   const [streakMilestone, setStreakMilestone] = useState<StreakMilestone | null>(null);
   const [streakReturned, setStreakReturned] = useState(false);
   const player = useAudioPlayer(null);
@@ -147,6 +150,18 @@ export default function HomeScreen() {
       AsyncStorage.getItem(key).then(val => setBookmarked(!!val));
     }
   }, [ayah]);
+
+  // Devotionals (occasion duas & ziyarat): best-effort — an empty seed or
+  // a missing table simply means no cards are shown. Never placeholder text.
+  useEffect(() => {
+    (async () => {
+      try {
+        setDevotionals(await getTodayDevotionals());
+      } catch {
+        setDevotionals(null);
+      }
+    })();
+  }, []);
 
   // Fetch prayer times
   useEffect(() => {
@@ -378,6 +393,21 @@ export default function HomeScreen() {
             ) : null}
           </View>
         )}
+
+        {/* Devotional cards — only when a matching devotional_texts row exists */}
+        {devotionals?.occasionDevotional && (
+          <DevotionalCard
+            devotional={devotionals.occasionDevotional}
+            label="For today's occasion"
+          />
+        )}
+        {devotionals?.kumayl &&
+          isThursdayEvening(new Date(), prayerTimes?.maghrib ?? null) && (
+            <DevotionalCard
+              devotional={devotionals.kumayl}
+              label="Thursday evening · Laylat al-Jumu'ah"
+            />
+          )}
 
         {/* Audio + Share + Bookmark row */}
         <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 8, marginBottom: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
