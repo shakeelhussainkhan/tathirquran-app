@@ -14,7 +14,17 @@ import {
   scheduleDailyNotification,
   cancelNotifications,
   getNotificationSettings,
+  requestNotificationPermission,
 } from '../lib/notifications';
+import { AZAN_RECORDING } from '../lib/azan';
+import {
+  ensureCoordsInteractive,
+  getAzanAlertsEnabled,
+  getMorningVerseEnabled,
+  refreshPrayerAlerts,
+  setAzanAlertsEnabled,
+  setMorningVerseEnabled,
+} from '../lib/prayerAlerts';
 import { getOfflineSyncStatus, syncOfflineData, type OfflineSyncStatus } from '../lib/offlineDb';
 import ReciterPicker from '../components/ReciterPicker';
 import {
@@ -56,6 +66,8 @@ export default function SettingsScreen() {
   const [showTransliteration, setShowTransliteration] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [notifHour, setNotifHour] = useState(7);
+  const [morningVerseOn, setMorningVerseOn] = useState(false);
+  const [azanAlertsOn, setAzanAlertsOn] = useState(false);
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
   const [reciter, setReciter] = useState<Reciter>(DEFAULT_RECITER);
   const [downloadsSize, setDownloadsSize] = useState(0);
@@ -87,6 +99,8 @@ export default function SettingsScreen() {
       const notif = await getNotificationSettings();
       setNotifEnabled(notif.enabled);
       setNotifHour(notif.hour);
+      setMorningVerseOn(await getMorningVerseEnabled());
+      setAzanAlertsOn(await getAzanAlertsEnabled());
       setStreak(await getStreakState());
       setReciter(await getSelectedReciter());
       setDownloadsSize(await getDownloadsSizeBytes());
@@ -202,6 +216,60 @@ export default function SettingsScreen() {
     } else {
       await cancelNotifications();
     }
+  };
+
+  // Wave 3 (#7/#3): both lock-screen features need notification
+  // permission AND a stored location (Fajr/prayer times are computed
+  // from coordinates). Returns false — with an explanation shown —
+  // when either prerequisite is missing, so the caller reverts.
+  const enablePrayerAlertPrereqs = async (): Promise<boolean> => {
+    const granted = await requestNotificationPermission();
+    if (!granted) {
+      Alert.alert(
+        'Notifications are off',
+        'TathirQuran needs notification permission to show the morning verse and prayer-time alerts. You can allow it in your device Settings.'
+      );
+      return false;
+    }
+    const coords = await ensureCoordsInteractive();
+    if (!coords) {
+      Alert.alert(
+        'Location needed',
+        'Prayer times are calculated from your location. Please allow location access so Fajr and the prayer times can be scheduled.'
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const toggleMorningVerse = async (val: boolean) => {
+    if (val) {
+      setMorningVerseOn(true);
+      if (!(await enablePrayerAlertPrereqs())) {
+        setMorningVerseOn(false);
+        return;
+      }
+      await setMorningVerseEnabled(true);
+    } else {
+      setMorningVerseOn(false);
+      await setMorningVerseEnabled(false);
+    }
+    await refreshPrayerAlerts();
+  };
+
+  const toggleAzanAlerts = async (val: boolean) => {
+    if (val) {
+      setAzanAlertsOn(true);
+      if (!(await enablePrayerAlertPrereqs())) {
+        setAzanAlertsOn(false);
+        return;
+      }
+      await setAzanAlertsEnabled(true);
+    } else {
+      setAzanAlertsOn(false);
+      await setAzanAlertsEnabled(false);
+    }
+    await refreshPrayerAlerts();
   };
 
   const changeHour = async (delta: number) => {
@@ -345,6 +413,34 @@ export default function SettingsScreen() {
             </View>
           </View>
         )}
+
+        <View style={s.row}>
+          <Text style={s.rowLabel}>Morning verse on lock screen</Text>
+          <Switch
+            value={morningVerseOn}
+            onValueChange={toggleMorningVerse}
+            trackColor={{ false: 'rgba(139,101,32,0.2)', true: theme.gold }}
+            thumbColor={theme.bg}
+          />
+        </View>
+        <Text style={s.syncNote}>
+          Shows the day's verse in full on your lock screen at Fajr — the first thing you see on waking.
+        </Text>
+
+        <View style={s.row}>
+          <Text style={s.rowLabel}>Azan alerts at prayer times</Text>
+          <Switch
+            value={azanAlertsOn}
+            onValueChange={toggleAzanAlerts}
+            trackColor={{ false: 'rgba(139,101,32,0.2)', true: theme.gold }}
+            thumbColor={theme.bg}
+          />
+        </View>
+        <Text style={s.syncNote}>
+          {AZAN_RECORDING
+            ? `Azan by ${AZAN_RECORDING.muezzin} — ${AZAN_RECORDING.license}, via ${AZAN_RECORDING.sourceName}.`
+            : 'Azan recording pending — alerts currently use the standard notification sound until a verified Shia azan recording is bundled.'}
+        </Text>
 
         {/* RECITATION */}
         <Text style={s.sectionHeader}>RECITATION</Text>
