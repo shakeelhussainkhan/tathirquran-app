@@ -25,7 +25,7 @@
  *   - Full recording: assets/sounds/jafri-shia-azan.mp3 (5:24) —
  *     byte-identical to the Jafri Library file; used for in-app
  *     playback from Settings.
- *   - Notification excerpt: assets/sounds/azan-notification.wav —
+ *   - Notification excerpt: assets/sounds/azan_notification.wav —
  *     the first 29 seconds of the same recording (iOS caps custom
  *     notification sounds at 30 s) with a gentle 2-second fade-out;
  *     listed in app.json's expo-notifications plugin "sounds" array.
@@ -45,7 +45,7 @@ export interface AzanRecordingInfo {
 }
 
 export const AZAN_RECORDING: AzanRecordingInfo = {
-  fileName: 'azan-notification.wav',
+  fileName: 'azan_notification.wav',
   playbackFileName: 'jafri-shia-azan.mp3',
   sourceName: 'Jafri Library',
   sourceUrl: 'https://jafrilibrary.com/audio/286',
