@@ -43,7 +43,7 @@ export default function Onboarding({ onComplete }: Props) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.goldBar} />
-        <ScrollView contentContainerStyle={styles.centerContent}>
+        <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={styles.centerContent}>
           <View style={styles.iconWrap}>
             <Image
               source={require('../assets/icon.png')}
@@ -71,7 +71,7 @@ export default function Onboarding({ onComplete }: Props) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.goldBar} />
-        <ScrollView contentContainerStyle={styles.stepContent}>
+        <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={styles.stepContent}>
           <Text style={styles.stepIndicator}>Step 1 of 2</Text>
           <Text style={styles.stepTitle}>Choose your language</Text>
           <View style={styles.radioGroup}>
@@ -107,7 +107,7 @@ export default function Onboarding({ onComplete }: Props) {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.goldBar} />
-      <ScrollView contentContainerStyle={styles.stepContent}>
+      <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={styles.stepContent}>
         <Text style={styles.stepIndicator}>Step 2 of 2</Text>
         <Text style={styles.stepTitle}>Morning reminder</Text>
 

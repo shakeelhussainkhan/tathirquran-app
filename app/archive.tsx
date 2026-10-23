@@ -138,7 +138,7 @@ export default function ArchiveScreen() {
             <ActivityIndicator color={Colors.bronze} />
           </View>
         ) : (
-          <ScrollView>
+          <ScrollView contentInsetAdjustmentBehavior="never">
             {schedule.map((item, i) => (
               <TouchableOpacity
                 key={i}
@@ -157,7 +157,7 @@ export default function ArchiveScreen() {
           </ScrollView>
         )
       ) : tab === 'bookmarks' ? (
-        <ScrollView>
+        <ScrollView contentInsetAdjustmentBehavior="never">
           {bookmarks.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
@@ -210,7 +210,7 @@ export default function ArchiveScreen() {
           )}
         </ScrollView>
       ) : tab === 'memorized' ? (
-        <ScrollView>
+        <ScrollView contentInsetAdjustmentBehavior="never">
           {memorized.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
@@ -243,7 +243,7 @@ export default function ArchiveScreen() {
           )}
         </ScrollView>
       ) : (
-        <ScrollView>
+        <ScrollView contentInsetAdjustmentBehavior="never">
           {noteEntries.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={[styles.emptyText, { color: theme.textSecondary }]}>

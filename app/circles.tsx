@@ -197,7 +197,7 @@ export default function CirclesScreen() {
         <Text style={s.headerTitle}>FAMILY CIRCLE</Text>
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll}>
+      <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={s.scroll}>
         {!membership ? (
           <>
             <Text style={s.intro}>

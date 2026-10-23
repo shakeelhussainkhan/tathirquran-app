@@ -51,7 +51,7 @@ export default function DevotionalScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]} edges={['top', 'bottom']}>
       <View style={[styles.goldBar, { backgroundColor: theme.bronze }]} />
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={styles.scroll}>
         <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7} style={styles.backBtn}>
           <Text style={[styles.backText, { color: theme.bronze }]}>← TODAY</Text>
         </TouchableOpacity>

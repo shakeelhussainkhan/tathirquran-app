@@ -146,7 +146,7 @@ export default function AyahDetailScreen() {
           </Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.body}>
+        <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={styles.body}>
           <View style={styles.refRow}>
             <Text style={[styles.surahLabel, { color: theme.textSecondary }]}>
               {surah?.name_english}

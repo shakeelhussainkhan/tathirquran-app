@@ -236,6 +236,7 @@ export default function SearchScreen() {
         </View>
       ) : (
         <FlatList
+          contentInsetAdjustmentBehavior="never"
           data={results}
           keyExtractor={(item) => String(item.ayahId)}
           renderItem={renderResult}
