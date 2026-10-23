@@ -5,12 +5,17 @@ import {
   ensureOfflineData,
   isOfflineStale,
   localGetAyah,
+  localGetAyahRange,
   localGetAyahWords,
   localGetDefaultTranslation,
+  localGetJuzRanges,
   localGetLiveLanguages,
+  localGetRangeTranslation,
   localGetRecentSchedule,
   localGetScheduleAyahId,
+  localGetSurahs,
   localGetTafsir,
+  type LocalJuzRange,
 } from './offlineDb';
 
 /**
@@ -472,4 +477,136 @@ export async function getAyahDetail(surahNumber: number, ayahNumber: number) {
   const tafsirEntries = await getAllTafsirForAyah(ayah.ayah_id, 'en');
 
   return { ayah, translations, tafsirEntries };
+}
+
+// ---------- Verse reader ranges (Mushaf / Juz / Khatmah portions) ----------
+// Local-first like every read above: the offline store holds the full Quran
+// text and every translation, so ranges are served on-device and only fall
+// back to Supabase when the local store is empty.
+
+/** All surah metadata rows, in surah order (Mushaf index). */
+export async function getSurahList() {
+  return localFirst<any[]>(
+    () => localGetSurahs(),
+    async () => {
+      const { data } = await supabase.from('surahs').select('*').order('surah_number');
+      return data || [];
+    },
+  );
+}
+
+/** Every ayah in an ayah_id range (inclusive), in Quran order. */
+export async function getAyahRange(startAyahId: number, endAyahId: number) {
+  return localFirst<any[]>(
+    () => localGetAyahRange(startAyahId, endAyahId),
+    async () => {
+      const { data } = await supabase
+        .from('ayahs')
+        .select('*, surahs(*)')
+        .gte('ayah_id', startAyahId)
+        .lte('ayah_id', endAyahId)
+        .order('ayah_id');
+      return data || [];
+    },
+  );
+}
+
+export interface RangeTranslation {
+  scholarName: string | null;
+  /** ayah_id -> translation text, for the ayahs that have one. */
+  texts: Record<number, string>;
+}
+
+/**
+ * The default translation for `languageCode` across an ayah_id range —
+ * the same translation the Today screen shows for that language.
+ */
+export async function getRangeTranslation(
+  startAyahId: number,
+  endAyahId: number,
+  languageCode: string = 'en',
+): Promise<RangeTranslation> {
+  const result = await localFirst<RangeTranslation | null>(
+    () => localGetRangeTranslation(startAyahId, endAyahId, languageCode),
+    async () => {
+      const { data: translation } = await supabase
+        .from('translations')
+        .select('translation_id, scholar_name')
+        .eq('language_code', languageCode)
+        .eq('is_default', true)
+        .single();
+      if (!translation) return null;
+
+      // PostgREST caps responses at 1,000 rows — page through the range.
+      const texts: Record<number, string> = {};
+      const PAGE = 1000;
+      for (let from = startAyahId; from <= endAyahId; from += PAGE) {
+        const to = Math.min(endAyahId, from + PAGE - 1);
+        const { data: rows } = await supabase
+          .from('ayah_translations')
+          .select('ayah_id, text')
+          .eq('translation_id', translation.translation_id)
+          .gte('ayah_id', from)
+          .lte('ayah_id', to)
+          .order('ayah_id');
+        for (const r of (rows as any[]) || []) texts[r.ayah_id] = r.text;
+        if (!rows || rows.length < to - from + 1) break;
+      }
+      return {
+        scholarName: translation.scholar_name ?? null,
+        texts,
+      } as RangeTranslation;
+    },
+  );
+  return result ?? { scholarName: null, texts: {} };
+}
+
+export type JuzRange = LocalJuzRange;
+
+/**
+ * Juz boundaries (start/end refs + counts) for the Mushaf Juz index.
+ * Derived from the per-ayah juz_number data the app already syncs — no
+ * boundary list is hardcoded here.
+ */
+export async function getJuzRanges(): Promise<JuzRange[]> {
+  return localFirst<JuzRange[]>(
+    () => localGetJuzRanges(),
+    async () => {
+      // Fallback only (the local store is the primary path): resolve each
+      // juz's first/last ayah and count with small per-juz queries.
+      const ranges: JuzRange[] = [];
+      await Promise.all(
+        Array.from({ length: 30 }, (_, i) => i + 1).map(async (juz) => {
+          const base = () =>
+            supabase
+              .from('ayahs')
+              .select('ayah_id, surah_number, ayah_number')
+              .eq('juz_number', juz);
+          const [first, last, counted] = await Promise.all([
+            base().order('ayah_id', { ascending: true }).limit(1),
+            base().order('ayah_id', { ascending: false }).limit(1),
+            supabase
+              .from('ayahs')
+              .select('ayah_id', { count: 'exact' })
+              .eq('juz_number', juz)
+              .limit(1),
+          ]);
+          const f = (first.data as any[])?.[0];
+          const l = (last.data as any[])?.[0];
+          if (!f || !l) return;
+          ranges.push({
+            juz,
+            startAyahId: f.ayah_id,
+            endAyahId: l.ayah_id,
+            startSurah: f.surah_number,
+            startAyah: f.ayah_number,
+            endSurah: l.surah_number,
+            endAyah: l.ayah_number,
+            ayahCount: counted.count ?? l.ayah_id - f.ayah_id + 1,
+          });
+        }),
+      );
+      return ranges.sort((a, b) => a.juz - b.juz);
+    },
+  );
 }

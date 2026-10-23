@@ -224,7 +224,11 @@ export default function SettingsScreen() {
       <View style={s.header}>
         <Text style={s.headerTitle}>SETTINGS</Text>
       </View>
-      <ScrollView>
+      {/* contentInsetAdjustmentBehavior="never": SafeAreaView above already
+          applies the safe-area insets; leaving UIKit's automatic adjustment
+          on as well double-manages the top inset and can leave the top of
+          the scroll content clipped/unreachable (v1.0.4 fix, suggestion #5). */}
+      <ScrollView style={{ flex: 1 }} contentInsetAdjustmentBehavior="never">
         {/* DISPLAY */}
         <Text style={s.sectionHeader}>DISPLAY</Text>
 
@@ -479,6 +483,19 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           );
         })()}
+        {/* ISLAMIC CALENDAR */}
+        <Text style={s.sectionHeader}>ISLAMIC CALENDAR</Text>
+
+        <TouchableOpacity style={s.row} onPress={() => router.push('/calendar' as any)}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text style={s.rowLabel}>Islamic calendar</Text>
+            <Text style={{ fontFamily: 'Amiri_400Regular', fontSize: 12, color: theme.textSecondary, marginTop: 3 }}>
+              Wiladat, Shahadat and the occasions of the year, by Hijri month
+            </Text>
+          </View>
+          <Text style={s.rowLink}>Open →</Text>
+        </TouchableOpacity>
+
         {/* FAMILY CIRCLE */}
         <Text style={s.sectionHeader}>FAMILY CIRCLE</Text>
 
