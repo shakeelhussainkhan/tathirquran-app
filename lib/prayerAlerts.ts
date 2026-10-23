@@ -238,8 +238,8 @@ async function ensureAndroidChannels(): Promise<void> {
   await Notifications.setNotificationChannelAsync(AZAN_CHANNEL_ID, {
     name: 'Azan',
     importance: Notifications.AndroidImportance.HIGH,
-    // Carries the bundled azan file once AZAN_RECORDING is set;
-    // 'default' (system sound) until then.
+    // Carries the bundled azan excerpt (AZAN_NOTIFICATION_SOUND,
+    // the single source of truth in lib/azan.ts).
     sound: AZAN_NOTIFICATION_SOUND,
   });
 }
@@ -316,8 +316,8 @@ async function scheduleAzanAlerts(coords: Coords, days: number): Promise<number>
         identifier: `${AZAN_ID_PREFIX}${prayer}-${localDateKey(day)}`,
         content: {
           title: `Azan — ${AZAN_PRAYER_LABELS[prayer]}`,
-          // The "recording pending" disclosure lives in Settings, where
-          // the toggle is labelled — not repeated in every alert body.
+          // The Jafri Library credit lives in Settings, beside the
+          // toggle — not repeated in every alert body.
           body: `Time for ${AZAN_PRAYER_LABELS[prayer]} prayer.`,
           sound: AZAN_NOTIFICATION_SOUND,
           data: { type: 'azan', prayer },

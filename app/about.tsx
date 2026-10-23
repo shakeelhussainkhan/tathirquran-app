@@ -81,7 +81,8 @@ export default function AboutScreen() {
         <Text style={styles.creditText}>
           The Urdu translation by Syed Abu Muhammad Naqvi is included with the
           kind permission of the Jafri Library, and is reproduced without
-          alteration.
+          alteration. The Shia azan recording sounded by the app's prayer
+          alerts is likewise courtesy of the Jafri Library.
         </Text>
         <TouchableOpacity onPress={() => Linking.openURL('https://jafrilibrary.org')}>
           <Text style={styles.email}>Jafri Library — jafrilibrary.org</Text>

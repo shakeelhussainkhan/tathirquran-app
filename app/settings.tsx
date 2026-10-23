@@ -16,7 +16,8 @@ import {
   getNotificationSettings,
   requestNotificationPermission,
 } from '../lib/notifications';
-import { AZAN_RECORDING } from '../lib/azan';
+import { AZAN_RECORDING, AZAN_PLAYBACK_ASSET } from '../lib/azan';
+import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
 import {
   ensureCoordsInteractive,
   getAzanAlertsEnabled,
@@ -68,6 +69,8 @@ export default function SettingsScreen() {
   const [notifHour, setNotifHour] = useState(7);
   const [morningVerseOn, setMorningVerseOn] = useState(false);
   const [azanAlertsOn, setAzanAlertsOn] = useState(false);
+  const azanPlayer = useAudioPlayer(AZAN_PLAYBACK_ASSET);
+  const azanStatus = useAudioPlayerStatus(azanPlayer);
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
   const [reciter, setReciter] = useState<Reciter>(DEFAULT_RECITER);
   const [downloadsSize, setDownloadsSize] = useState(0);
@@ -272,6 +275,27 @@ export default function SettingsScreen() {
     await refreshPrayerAlerts();
   };
 
+  const toggleAzanPlayback = async () => {
+    if (azanStatus.playing) {
+      azanPlayer.pause();
+      return;
+    }
+    // A previous play that ran to the end restarts from the beginning.
+    if (
+      azanStatus.didJustFinish ||
+      (azanStatus.duration > 0 && azanStatus.currentTime >= azanStatus.duration - 0.25)
+    ) {
+      await azanPlayer.seekTo(0).catch(() => {});
+    }
+    await setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
+    azanPlayer.play();
+  };
+
+  const stopAzanPlayback = async () => {
+    azanPlayer.pause();
+    await azanPlayer.seekTo(0).catch(() => {});
+  };
+
   const changeHour = async (delta: number) => {
     const newHour = Math.max(0, Math.min(23, notifHour + delta));
     setNotifHour(newHour);
@@ -438,9 +462,23 @@ export default function SettingsScreen() {
         </View>
         <Text style={s.syncNote}>
           {AZAN_RECORDING
-            ? `Azan by ${AZAN_RECORDING.muezzin} — ${AZAN_RECORDING.license}, via ${AZAN_RECORDING.sourceName}.`
+            ? 'Azan recording courtesy of Jafri Library. Alerts sound its opening; play the full recording below.'
             : 'Azan recording pending — alerts currently use the standard notification sound until a verified Shia azan recording is bundled.'}
         </Text>
+        {AZAN_RECORDING ? (
+          <View style={s.azanPlayRow}>
+            <TouchableOpacity onPress={toggleAzanPlayback}>
+              <Text style={s.azanPlayLabel}>
+                {azanStatus.playing ? '⏸  Pause the azan' : '▶  Play the azan'}
+              </Text>
+            </TouchableOpacity>
+            {azanStatus.currentTime > 0 ? (
+              <TouchableOpacity onPress={stopAzanPlayback}>
+                <Text style={s.azanStopLabel}>Stop</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
 
         {/* RECITATION */}
         <Text style={s.sectionHeader}>RECITATION</Text>
@@ -750,6 +788,25 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
       paddingTop: 10,
       lineHeight: 16,
       opacity: 0.8,
+    },
+    azanPlayRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 24,
+      paddingHorizontal: 20,
+      paddingTop: 8,
+    },
+    azanPlayLabel: {
+      fontFamily: 'Amiri_400Regular',
+      fontSize: 13,
+      color: theme.gold,
+      letterSpacing: 0.5,
+    },
+    azanStopLabel: {
+      fontFamily: 'Amiri_400Regular',
+      fontSize: 13,
+      color: theme.textSecondary,
+      letterSpacing: 0.5,
     },
     credits: {
       paddingVertical: 32,
