@@ -3,14 +3,31 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { router } from 'expo-router';
-import { searchAyahs } from '../lib/queries';
+import { getSurahList, searchAyahs } from '../lib/queries';
+import {
+  entriesFromSurahRows,
+  matchSurahs,
+  type SurahMatchEntry,
+} from '../lib/surahSearch';
+import { SURAH_AYAH_COUNTS, SURAH_NAMES_ENGLISH } from '../lib/khatmah';
 import { Colors } from '../constants/colors';
 import { useTheme } from '../lib/theme';
 
 const DEBOUNCE_MS = 400;
 const MIN_QUERY_LENGTH = 2;
+
+/** Built-in factual surah metadata — the same fallback the Mushaf index uses. */
+function fallbackSurahEntries(): SurahMatchEntry[] {
+  return SURAH_NAMES_ENGLISH.map((name, i) => ({
+    number: i + 1,
+    nameEnglish: name,
+    nameTransliterated: null,
+    nameArabic: null,
+    ayahCount: SURAH_AYAH_COUNTS[i],
+  }));
+}
 
 /** Returns a window of `text` centred on the first case-insensitive match. */
 function snippetAround(text: string, query: string, radius = 110): string {
@@ -58,7 +75,40 @@ export default function SearchScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
+  const [surahEntries, setSurahEntries] = useState<SurahMatchEntry[]>([]);
   const requestIdRef = useRef(0);
+
+  // Load the surah list once, for name matching (lib/surahSearch.ts).
+  // Mirrors the Mushaf index: stored names when all 114 load, otherwise
+  // the built-in factual fallback list.
+  useEffect(() => {
+    let live = true;
+    getSurahList()
+      .then((rows) => {
+        if (!live) return;
+        setSurahEntries(
+          rows && rows.length === 114
+            ? entriesFromSurahRows(rows)
+            : fallbackSurahEntries(),
+        );
+      })
+      .catch(() => {
+        if (live) setSurahEntries(fallbackSurahEntries());
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // Surahs whose name matches the current query — shown above the verse
+  // results, and on their own when no verse text matches (the reported
+  // "Surah at tahreem" case). Computed from the debounced query so it
+  // stays in step with the verse search; a bare surah number ("66")
+  // matches even though it is shorter than a text query needs to be.
+  const surahMatches = useMemo(
+    () => matchSurahs(query, surahEntries),
+    [query, surahEntries],
+  );
 
   // Debounce typed input: a new term resets to page 1.
   useEffect(() => {
@@ -180,6 +230,58 @@ export default function SearchScreen() {
     );
   };
 
+  // List header: the SURAHS section (when the query names a surah) sits
+  // above the verse results; tapping a surah opens it in the verse
+  // reader, exactly as the Mushaf index does. The verse count line keeps
+  // its original wording; when a surah matched but no verse text did,
+  // the line says so instead of the screen claiming "No results".
+  const renderListHeader = () => {
+    const countLine = (
+      <Text style={[styles.count, { color: theme.textSecondary }]}>
+        {results.length > 0
+          ? `${totalResults} ${totalResults === 1 ? 'verse' : 'verses'} found for “${query}”`
+          : `No verses matched “${query}”`}
+      </Text>
+    );
+    if (surahMatches.length === 0) return countLine;
+    return (
+      <View>
+        <Text style={[styles.count, { color: theme.textSecondary }]}>Surahs</Text>
+        {surahMatches.map((entry) => (
+          <TouchableOpacity
+            key={entry.number}
+            style={[
+              styles.surahRow,
+              { borderColor: theme.border, backgroundColor: theme.bgCard },
+            ]}
+            onPress={() => router.push(`/read?mode=surah&surah=${entry.number}` as any)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.surahNumber, { color: theme.gold }]}>
+              {entry.number}
+            </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.surahName, { color: theme.text }]}>
+                {entry.nameEnglish}
+              </Text>
+              {entry.ayahCount ? (
+                <Text style={[styles.surahMeta, { color: theme.textSecondary }]}>
+                  {entry.ayahCount} verses
+                </Text>
+              ) : null}
+            </View>
+            {entry.nameArabic ? (
+              <Text style={[styles.surahArabic, { color: theme.bronze }]}>
+                {entry.nameArabic}
+              </Text>
+            ) : null}
+          </TouchableOpacity>
+        ))}
+        {searched ? <View style={{ marginTop: 14 }}>{countLine}</View> : null}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]} edges={['top', 'bottom']}>
       <View style={[styles.goldBar, { backgroundColor: theme.bronze }]} />
@@ -194,7 +296,7 @@ export default function SearchScreen() {
           style={[styles.input, { color: theme.text, borderColor: theme.border, backgroundColor: theme.bgCard }]}
           value={input}
           onChangeText={setInput}
-          placeholder="Search the Quran — a word, a phrase, or Arabic…"
+          placeholder="Search the Quran — a word, a phrase, or a surah name…"
           placeholderTextColor={theme.textSecondary}
           autoCorrect={false}
           returnKeyType="search"
@@ -202,8 +304,9 @@ export default function SearchScreen() {
         />
         <Text style={[styles.hint, { color: theme.textSecondary }]}>
           Searches the Arabic text and every translation (English, Persian and
-          Urdu). Arabic is matched exactly as written in the Uthmani script,
-          including its diacritics.
+          Urdu), and finds surahs by name — try “Yasin”, “at-Tahrim”, or a
+          surah number like 66. Arabic is matched exactly as written in the
+          Uthmani script, including its diacritics.
         </Text>
       </View>
 
@@ -212,26 +315,27 @@ export default function SearchScreen() {
           <ActivityIndicator color={Colors.bronze} />
           <Text style={[styles.centerText, { color: theme.textSecondary }]}>Searching…</Text>
         </View>
-      ) : error && results.length === 0 ? (
+      ) : error && results.length === 0 && surahMatches.length === 0 ? (
         <View style={styles.center}>
           <Text style={[styles.centerText, { color: theme.textSecondary }]}>{error}</Text>
         </View>
-      ) : query.length < MIN_QUERY_LENGTH ? (
+      ) : query.length < MIN_QUERY_LENGTH && surahMatches.length === 0 ? (
         <View style={styles.center}>
           <Text style={[styles.centerText, { color: theme.textSecondary }]}>
             Type at least {MIN_QUERY_LENGTH} characters — for example
-            “mercy”, “patience”, or an Arabic word — and results will appear
-            as you type.
+            “mercy”, “patience”, a surah name like “Yasin”, or an Arabic
+            word — and results will appear as you type.
           </Text>
         </View>
-      ) : searched && results.length === 0 ? (
+      ) : searched && results.length === 0 && surahMatches.length === 0 ? (
         <View style={styles.center}>
           <Text style={[styles.emptyTitle, { color: theme.text }]}>
             No results for “{query}”
           </Text>
           <Text style={[styles.centerText, { color: theme.textSecondary }]}>
-            Check the spelling, try a shorter phrase, or search the Arabic
-            text exactly as it appears in the Uthmani script.
+            Check the spelling, try a shorter phrase, or type a surah name
+            (like “Yasin”) or its number. Arabic is matched exactly as it
+            appears in the Uthmani script.
           </Text>
         </View>
       ) : (
@@ -243,12 +347,7 @@ export default function SearchScreen() {
           contentContainerStyle={styles.list}
           onEndReached={loadMore}
           onEndReachedThreshold={0.4}
-          ListHeaderComponent={
-            <Text style={[styles.count, { color: theme.textSecondary }]}>
-              {totalResults} {totalResults === 1 ? 'verse' : 'verses'} found
-              for “{query}”
-            </Text>
-          }
+          ListHeaderComponent={renderListHeader}
           ListFooterComponent={
             loadingMore ? (
               <View style={{ paddingVertical: 16 }}>
@@ -309,6 +408,25 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     padding: 16,
   },
+  surahRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderWidth: 0.5,
+    borderRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 10,
+  },
+  surahNumber: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 14,
+    width: 30,
+    textAlign: 'center',
+  },
+  surahName: { fontFamily: 'Amiri_400Regular', fontSize: 15 },
+  surahMeta: { fontFamily: 'Amiri_400Regular', fontSize: 11, marginTop: 2 },
+  surahArabic: { fontFamily: 'Amiri_400Regular', fontSize: 18 },
   ref: {
     fontFamily: 'Amiri_400Regular',
     fontSize: 11,
