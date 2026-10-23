@@ -1,13 +1,15 @@
-import { Tabs } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { Amiri_400Regular, Amiri_700Bold } from '@expo-google-fonts/amiri';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Colors } from '../constants/colors';
-import { Text } from 'react-native';
+import { AppState, Text } from 'react-native';
 import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import Onboarding from './onboarding';
 import { ensureOfflineData } from '../lib/offlineDb';
+import { refreshPrayerAlerts } from '../lib/prayerAlerts';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -24,6 +26,26 @@ export default function RootLayout() {
     // Offline-first: mirror the full Quran corpus locally on first launch
     // (and refresh it when stale). Fire-and-forget — never blocks launch.
     void ensureOfflineData();
+    // Wave 3 (#7/#3): keep the rolling window of morning-verse and azan
+    // notifications topped up — on launch and every return to foreground.
+    void refreshPrayerAlerts();
+    const appStateSub = AppState.addEventListener('change', state => {
+      if (state === 'active') void refreshPrayerAlerts();
+    });
+    return () => appStateSub.remove();
+  }, []);
+
+  useEffect(() => {
+    // Wave 3: tapping a morning-verse or azan notification opens Today.
+    const openToday = (response: Notifications.NotificationResponse | null) => {
+      const type = response?.notification.request.content.data?.type;
+      if (type === 'morning-verse' || type === 'azan') {
+        router.navigate('/');
+      }
+    };
+    void Notifications.getLastNotificationResponseAsync().then(openToday);
+    const responseSub = Notifications.addNotificationResponseReceivedListener(openToday);
+    return () => responseSub.remove();
   }, []);
 
   if (!fontsLoaded || showOnboarding === null) return null;

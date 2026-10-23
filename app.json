@@ -27,7 +27,8 @@
       },
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
+        "VIBRATE",
+        "SCHEDULE_EXACT_ALARM"
       ]
     },
     "plugins": [
