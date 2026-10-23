@@ -10,37 +10,55 @@
  *      "Hayya 'ala khayril 'amal" (x2), and does NOT include the Fajr
  *      addition "as-salatu khayrun min an-nawm".
  * A non-Shia azan is NEVER substituted. See WAVE3-REPORT.md for the
- * source research and verdict (2026-10-22: no candidate passed both
- * halves of the gate, so the slot ships empty).
+ * source research and verdict.
  *
- * TO COMPLETE THIS FEATURE, a follow-up change needs to:
- *   1. Add the verified audio file under assets/sounds/ (iOS
- *      notification sounds must be <= 30 seconds; .wav recommended —
- *      trim an excerpt only if the licence permits derivatives).
- *   2. List the file in the expo-notifications plugin "sounds" array
- *      in app.json.
- *   3. Fill in AZAN_RECORDING below (fileName must match the bundled
- *      file name exactly) — the notification scheduling, the Android
- *      azan channel sound, and the Settings label all read from here.
- *   4. Wire in-app playback of the bundled asset (expo-audio) at the
- *      prayer-times surface.
+ * CURRENT RECORDING (selected by the app owner, 2026-10-22):
+ *   "Ammal & Namaz — Shia Azan [01]", hosted by the Jafri Library
+ *   (jafrilibrary.com/audio/286) — a Shia library; the item is
+ *   catalogued there explicitly as a Shia azan. Written permission to
+ *   bundle it was requested from the Jafri Library (Faiyaz Hasan) on
+ *   2026-10-22, in parallel with this wiring; Jafri Library is credited
+ *   in Settings and on the About screen. The reciter is not reliably
+ *   identified in the file's metadata, so no reciter is credited.
+ *
+ * FILES:
+ *   - Full recording: assets/sounds/jafri-shia-azan.mp3 (5:24) —
+ *     byte-identical to the Jafri Library file; used for in-app
+ *     playback from Settings.
+ *   - Notification excerpt: assets/sounds/azan-notification.wav —
+ *     the first 29 seconds of the same recording (iOS caps custom
+ *     notification sounds at 30 s) with a gentle 2-second fade-out;
+ *     listed in app.json's expo-notifications plugin "sounds" array.
  */
 
 export interface AzanRecordingInfo {
-  /** Bundled file name, exactly as listed in app.json plugin sounds. */
+  /** Bundled notification-sound file name, exactly as listed in app.json plugin sounds. */
   fileName: string;
-  /** Name of the muezzin / reciter, for the Settings attribution line. */
-  muezzin: string;
+  /** Full-recording file name under assets/sounds/, for in-app playback. */
+  playbackFileName: string;
   /** Where the recording came from (name of the source). */
   sourceName: string;
   /** Source page URL. */
   sourceUrl: string;
-  /** Licence under which it is bundled (e.g. "CC BY 4.0"). */
+  /** Basis under which it is bundled. */
   license: string;
 }
 
-/** Null until a recording passes BOTH halves of the gate above. */
-export const AZAN_RECORDING: AzanRecordingInfo | null = null;
+export const AZAN_RECORDING: AzanRecordingInfo = {
+  fileName: 'azan-notification.wav',
+  playbackFileName: 'jafri-shia-azan.mp3',
+  sourceName: 'Jafri Library',
+  sourceUrl: 'https://jafrilibrary.com/audio/286',
+  license:
+    'Courtesy of Jafri Library — written permission to bundle requested 2026-10-22 (owner-directed; do not ship publicly before the grant lands).',
+};
+
+/**
+ * The full azan recording as a bundled asset, for in-app playback
+ * (expo-audio accepts a require()'d asset as its source). Kept here so
+ * lib/azan.ts stays the single source of truth for azan audio.
+ */
+export const AZAN_PLAYBACK_ASSET = require('../assets/sounds/jafri-shia-azan.mp3');
 
 /**
  * Notification sound name to use for azan alerts: the bundled file when
