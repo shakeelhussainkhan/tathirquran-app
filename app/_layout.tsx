@@ -74,6 +74,15 @@ export default function RootLayout() {
           }}
         />
         <Tabs.Screen
+          name="mushaf"
+          options={{
+            title: 'Mushaf',
+            tabBarIcon: ({ color }) => (
+              <Text style={{ fontSize: 18, color }}>📖</Text>
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="search"
           options={{
             title: 'Search',
@@ -120,6 +129,8 @@ export default function RootLayout() {
         />
         <Tabs.Screen name="onboarding" options={{ href: null }} />
         <Tabs.Screen name="khatmah" options={{ href: null }} />
+        <Tabs.Screen name="read" options={{ href: null }} />
+        <Tabs.Screen name="calendar" options={{ href: null }} />
         <Tabs.Screen name="ayah/[surah]/[ayah]" options={{ href: null }} />
         <Tabs.Screen name="devotional/[slug]" options={{ href: null }} />
       </Tabs>

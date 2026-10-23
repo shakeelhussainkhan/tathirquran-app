@@ -156,7 +156,7 @@ export default function QiblaScreen() {
       )}
 
       {status === 'ready' && coords && (
-        <ScrollView contentContainerStyle={s.scroll}>
+        <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={s.scroll}>
           <Text style={s.intro}>The direction of prayer from where you are now.</Text>
 
           {/* Compass */}

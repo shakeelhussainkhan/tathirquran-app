@@ -1,4 +1,4 @@
-const HIJRI_MONTHS = [
+export const HIJRI_MONTHS = [
   'Muharram',
   'Safar',
   'Rabi al-Awwal',

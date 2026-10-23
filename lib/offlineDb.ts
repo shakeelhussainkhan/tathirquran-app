@@ -617,3 +617,136 @@ export async function localGetRecentSchedule(limit: number): Promise<LocalSchedu
           },
   }));
 }
+
+// ---------------------------------------------------------------------------
+// Range reads for the in-app verse reader (Mushaf / Juz / Khatmah portions).
+// Same local-first contract as the getters above: null / [] when the local
+// store is unavailable or empty, so callers fall back to the network.
+// ---------------------------------------------------------------------------
+
+/** All surah metadata rows from the local store, in surah order. */
+export async function localGetSurahs(): Promise<Row[]> {
+  const db = await getOfflineDb();
+  if (!db) return [];
+  return db.getAllAsync<Row>('SELECT * FROM surahs ORDER BY surah_number ASC');
+}
+
+/**
+ * Every ayah in an ayah_id range (inclusive), in Quran order, each with its
+ * surah metadata attached under `surahs` — the same shape as localGetAyah.
+ */
+export async function localGetAyahRange(
+  startAyahId: number,
+  endAyahId: number,
+): Promise<Row[]> {
+  const db = await getOfflineDb();
+  if (!db) return [];
+  const ayahs = await db.getAllAsync<Row>(
+    'SELECT * FROM ayahs WHERE ayah_id BETWEEN ? AND ? ORDER BY ayah_id ASC',
+    [startAyahId, endAyahId],
+  );
+  if (ayahs.length === 0) return [];
+  const surahs = await db.getAllAsync<Row>('SELECT * FROM surahs');
+  const byNumber = new Map(surahs.map((s) => [s.surah_number as number, s]));
+  return ayahs.map((a) => ({
+    ...a,
+    surahs: byNumber.get(a.surah_number as number) ?? null,
+  }));
+}
+
+export interface LocalRangeTranslation {
+  scholarName: string | null;
+  /** ayah_id -> translation text, for the ayahs that have one. */
+  texts: Record<number, string>;
+}
+
+/**
+ * The default translation for `languageCode` across an ayah_id range, in a
+ * single query (the range version of localGetDefaultTranslation). Null when
+ * the store or the language's default translation is unavailable.
+ */
+export async function localGetRangeTranslation(
+  startAyahId: number,
+  endAyahId: number,
+  languageCode: string,
+): Promise<LocalRangeTranslation | null> {
+  const db = await getOfflineDb();
+  if (!db) return null;
+  const translation = await db.getFirstAsync<Row>(
+    'SELECT * FROM translations WHERE language_code = ? AND is_default = 1 LIMIT 1',
+    [languageCode],
+  );
+  if (!translation) return null;
+  const rows = await db.getAllAsync<{ ayah_id: number; text: string }>(
+    'SELECT ayah_id, text FROM ayah_translations WHERE translation_id = ? AND ayah_id BETWEEN ? AND ?',
+    [translation.translation_id as number, startAyahId, endAyahId],
+  );
+  const texts: Record<number, string> = {};
+  for (const r of rows) texts[r.ayah_id] = r.text;
+  return {
+    scholarName: (translation.scholar_name as string) ?? null,
+    texts,
+  };
+}
+
+export interface LocalJuzRange {
+  juz: number;
+  startAyahId: number;
+  endAyahId: number;
+  startSurah: number;
+  startAyah: number;
+  endSurah: number;
+  endAyah: number;
+  ayahCount: number;
+}
+
+/**
+ * Juz boundaries derived from the per-ayah `juz_number` column already in
+ * the local store (synced from Supabase) — no boundary list is hardcoded.
+ * [] when the store is empty or juz data has not synced yet.
+ */
+export async function localGetJuzRanges(): Promise<LocalJuzRange[]> {
+  const db = await getOfflineDb();
+  if (!db) return [];
+  try {
+    const groups = await db.getAllAsync<{
+      juz_number: number;
+      start_id: number;
+      end_id: number;
+      n: number;
+    }>(
+      `SELECT juz_number, MIN(ayah_id) AS start_id, MAX(ayah_id) AS end_id,
+              COUNT(*) AS n
+         FROM ayahs
+        WHERE juz_number IS NOT NULL
+        GROUP BY juz_number
+        ORDER BY juz_number ASC`,
+    );
+    if (groups.length === 0) return [];
+    const out: LocalJuzRange[] = [];
+    for (const g of groups) {
+      const start = await db.getFirstAsync<{ surah_number: number; ayah_number: number }>(
+        'SELECT surah_number, ayah_number FROM ayahs WHERE ayah_id = ?',
+        [g.start_id],
+      );
+      const end = await db.getFirstAsync<{ surah_number: number; ayah_number: number }>(
+        'SELECT surah_number, ayah_number FROM ayahs WHERE ayah_id = ?',
+        [g.end_id],
+      );
+      if (!start || !end) continue;
+      out.push({
+        juz: g.juz_number,
+        startAyahId: g.start_id,
+        endAyahId: g.end_id,
+        startSurah: start.surah_number,
+        startAyah: start.ayah_number,
+        endSurah: end.surah_number,
+        endAyah: end.ayah_number,
+        ayahCount: g.n,
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}

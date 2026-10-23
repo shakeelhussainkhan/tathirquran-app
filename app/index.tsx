@@ -609,7 +609,7 @@ export default function HomeScreen() {
         <Text style={[styles.headerDate, { color: theme.textSecondary }]}>{hijri}</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={styles.scroll}>
         {/* Bismillah */}
         {showBismillah && (
           <Text style={[styles.bismillah, { color: theme.bronze + '8C' }]}>

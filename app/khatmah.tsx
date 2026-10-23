@@ -102,7 +102,7 @@ export default function KhatmahScreen() {
         <View style={{ width: 60 }} />
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll}>
+      <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={s.scroll}>
         {!state || !progress ? (
           <>
             <Text style={s.intro}>
@@ -160,6 +160,17 @@ export default function KhatmahScreen() {
                   Read at your own pace — your place is kept if a day is missed.
                 </Text>
                 <TouchableOpacity
+                  style={s.readBtn}
+                  onPress={() =>
+                    router.push(
+                      `/read?mode=portion&plan=${progress.plan.days}&portion=${progress.nextPortion!.index}` as any,
+                    )
+                  }
+                  activeOpacity={0.7}
+                >
+                  <Text style={s.readBtnText}>📖 READ THIS PORTION</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={s.doneBtn}
                   onPress={() => togglePortion(progress.nextPortion!.index, false)}
                   activeOpacity={0.7}
@@ -200,16 +211,29 @@ export default function KhatmahScreen() {
                   const done = state.completedPortions.includes(i);
                   const isNext = progress.nextPortion?.index === i;
                   return (
-                    <TouchableOpacity
+                    <View
                       key={i}
                       style={[s.portionRow, isNext && s.portionRowNext]}
-                      onPress={() => togglePortion(i, done)}
-                      activeOpacity={0.7}
                     >
-                      <Text style={[s.portionCheck, { color: done ? theme.gold : theme.textSecondary }]}>
-                        {done ? '✓' : '○'}
-                      </Text>
-                      <View style={{ flex: 1 }}>
+                      <TouchableOpacity
+                        onPress={() => togglePortion(i, done)}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityLabel={done ? 'Mark portion as not read' : 'Mark portion as read'}
+                      >
+                        <Text style={[s.portionCheck, { color: done ? theme.gold : theme.textSecondary }]}>
+                          {done ? '✓' : '○'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ flex: 1 }}
+                        onPress={() =>
+                          router.push(
+                            `/read?mode=portion&plan=${progress.plan.days}&portion=${i}` as any,
+                          )
+                        }
+                        activeOpacity={0.7}
+                      >
                         <Text style={[s.portionRange, { color: theme.text }]}>
                           {formatPortionRange(portion, surahNames)}
                         </Text>
@@ -217,15 +241,16 @@ export default function KhatmahScreen() {
                           Portion {i + 1} · {portion.ayahCount} verses
                           {isNext ? ' · up next' : ''}
                         </Text>
-                      </View>
-                    </TouchableOpacity>
+                      </TouchableOpacity>
+                    </View>
                   );
                 })}
               </View>
             )}
 
             <Text style={s.gentle}>
-              Tap a portion in the list to mark it read, or tap again to undo.
+              Tap a portion to read its verses here in the app. Tap the circle
+              to mark it read, or tap again to undo.
             </Text>
 
             <TouchableOpacity style={s.endBtn} onPress={confirmEndPlan} activeOpacity={0.7}>
@@ -358,6 +383,21 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
       color: theme.text,
       textAlign: 'center',
       marginBottom: 8,
+    },
+    readBtn: {
+      borderWidth: 0.5,
+      borderColor: theme.bronze,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 2,
+      alignSelf: 'center',
+      marginBottom: 10,
+    },
+    readBtnText: {
+      color: theme.bronze,
+      fontSize: 11,
+      letterSpacing: 1.5,
+      fontFamily: 'Amiri_400Regular',
     },
     doneBtn: {
       backgroundColor: theme.bronze,
