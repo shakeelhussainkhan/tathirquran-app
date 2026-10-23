@@ -11,6 +11,7 @@ const SCHOLARS = [
   { lang: 'Persian', name: 'Mahdi Ilahi Ghomshei', school: 'Iranian Shia', status: 'Live' },
   { lang: 'Urdu', name: 'Allama M.H. Najafi (RA)', school: 'Shia Ithna Ashari', status: 'Pending' },
   { lang: 'Urdu', name: 'Syed Z.H. Jawadi (RA)', school: 'Shia Ithna Ashari', status: 'Pending' },
+  { lang: 'Urdu', name: 'Syed Abu Muhammad Naqvi', school: 'Shia Ithna Ashari', status: 'Live' },
   { lang: 'Urdu', name: 'Maulana Farman Ali (RA)', school: 'Shia Ithna Ashari', status: 'Pending' },
 ];
 
@@ -74,6 +75,18 @@ export default function AboutScreen() {
           ))}
         </View>
 
+        {/* Naqvi translation credit — a condition of the Jafri Library's
+            permission (granted 2026-09-12): credit the translator and link
+            the library wherever his translation is offered. */}
+        <Text style={styles.creditText}>
+          The Urdu translation by Syed Abu Muhammad Naqvi is included with the
+          kind permission of the Jafri Library, and is reproduced without
+          alteration.
+        </Text>
+        <TouchableOpacity onPress={() => Linking.openURL('https://jafrilibrary.org')}>
+          <Text style={styles.email}>Jafri Library — jafrilibrary.org</Text>
+        </TouchableOpacity>
+
         <View style={styles.divider} />
 
         {/* Built by */}
@@ -119,6 +132,7 @@ const styles = StyleSheet.create({
   name: { fontFamily: 'Amiri_400Regular', fontSize: 18, color: Colors.ink, marginBottom: 2 },
   sub: { fontFamily: 'Amiri_400Regular', fontSize: 13, color: Colors.inkSoft, marginBottom: 12 },
   email: { fontFamily: 'Amiri_400Regular', fontSize: 15, color: Colors.bronze, letterSpacing: 0.5 },
+  creditText: { fontFamily: 'Amiri_400Regular', fontSize: 14, color: Colors.inkMid, lineHeight: 22, marginTop: 16, marginBottom: 6 },
   version: { fontFamily: 'Amiri_400Regular', fontSize: 12, color: Colors.inkSoft, textAlign: 'center', marginTop: 4 },
   fatihaSection: {
     marginVertical: 24, padding: 16,

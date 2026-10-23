@@ -46,9 +46,21 @@ abort "No xcodeproj found in ${iosDir}" unless project_path
 
 project = Xcodeproj::Project.open(project_path)
 
-# Skip if widget target already exists
+# Skip if widget target already exists — but still make sure the bundled
+# Nahjul Balagha quotes JSON is in the target's resources (added in
+# v1.0.4 Wave 2; older projects created before that lack it).
 if project.targets.any? { |t| t.name == '${WIDGET_TARGET_NAME}' }
-  puts "Widget target already present, skipping"
+  existing = project.targets.find { |t| t.name == '${WIDGET_TARGET_NAME}' }
+  has_json = existing.resources_build_phase.files.any? { |f| f.display_name == 'nahjulBalaghaQuotes.json' }
+  unless has_json
+    grp = project.main_group.groups.find { |g| g.name == '${WIDGET_TARGET_NAME}' } || project.main_group.new_group('${WIDGET_TARGET_NAME}', '${WIDGET_TARGET_NAME}')
+    ref = grp.files.find { |f| f.path == 'nahjulBalaghaQuotes.json' } || grp.new_file('nahjulBalaghaQuotes.json')
+    existing.resources_build_phase.add_file_reference(ref)
+    project.save
+    puts "Added nahjulBalaghaQuotes.json to existing widget target resources"
+  else
+    puts "Widget target already present, skipping"
+  end
   exit 0
 end
 
@@ -90,6 +102,10 @@ widget_group = project.main_group.new_group('${WIDGET_TARGET_NAME}', '${WIDGET_T
   widget_target.source_build_phase.add_file_reference(ref)
 end
 widget_group.new_file('Info.plist')
+# Bundled Nahjul Balagha quotes — a resource (not source), read at
+# runtime via Bundle.main by WidgetDataFetcher.todayQuote().
+quotes_ref = widget_group.new_file('nahjulBalaghaQuotes.json')
+widget_target.resources_build_phase.add_file_reference(quotes_ref)
 
 main_target.add_dependency(widget_target)
 
@@ -127,6 +143,12 @@ const withTathirQuranWidget = (config) => {
       for (const file of ['TathirQuranWidget.swift', 'WidgetDataFetcher.swift']) {
         fs.copyFileSync(path.join(srcDir, file), path.join(widgetDir, file));
       }
+      // The widget reads the SAME quotes file the app bundles — copied
+      // from the canonical lib/ copy so the two can never drift.
+      fs.copyFileSync(
+        path.join(__dirname, '..', 'lib', 'nahjulBalaghaQuotes.json'),
+        path.join(widgetDir, 'nahjulBalaghaQuotes.json'),
+      );
       fs.writeFileSync(path.join(widgetDir, 'Info.plist'), INFO_PLIST);
       console.log(`[withTathirQuranWidget] Copied widget sources to ${widgetDir}`);
 

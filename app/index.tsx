@@ -41,6 +41,8 @@ import { useTheme } from '../lib/theme';
 import { calculatePrayerTimes, formatTime } from '../lib/prayerTimes';
 import { getTodayDevotionals, isThursdayEvening, type TodayDevotionals } from '../lib/devotionals';
 import DevotionalCard from '../components/DevotionalCard';
+import { getTodayQuote } from '../lib/nahjulBalagha';
+import NahjulBalaghaCard from '../components/NahjulBalaghaCard';
 import {
   recordDailyVerseView,
   streakLabel,
@@ -92,6 +94,9 @@ export default function HomeScreen() {
   const [sharingCard, setSharingCard] = useState(false);
   const shareCardRef = useRef<View>(null);
   const [streak, setStreak] = useState<StreakState | null>(null);
+  // Bundled + deterministic by date, so a plain initializer is enough —
+  // no fetch, no loading state (lib/nahjulBalagha.ts).
+  const [todayQuote] = useState(() => getTodayQuote());
   const [devotionals, setDevotionals] = useState<TodayDevotionals | null>(null);
   const [streakMilestone, setStreakMilestone] = useState<StreakMilestone | null>(null);
   const [streakReturned, setStreakReturned] = useState(false);
@@ -674,6 +679,11 @@ export default function HomeScreen() {
         <Text style={[styles.scholar, { color: theme.bronze }]}>
           {translation?.translations?.scholar_name}
         </Text>
+
+        {/* Daily Nahjul Balagha quote — bundled verbatim sayings (Ali Raza
+            translation, al-islam.org), deterministic by UTC date; see
+            lib/nahjulBalagha.ts. Below the verse, in its own panel. */}
+        {todayQuote && <NahjulBalaghaCard quote={todayQuote} />}
 
         {/* Streak — small and gentle; milestones celebrate, misses welcome */}
         {streak && streak.current_streak > 0 && (
