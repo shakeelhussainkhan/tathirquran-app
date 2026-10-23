@@ -49,7 +49,7 @@
         {
           "icon": "./assets/icon.png",
           "color": "#c9a227",
-          "sounds": ["./assets/sounds/azan-notification.wav"],
+          "sounds": ["./assets/sounds/azan_notification.wav"],
           "mode": "production"
         }
       ],
