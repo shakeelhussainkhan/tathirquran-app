@@ -61,7 +61,8 @@
         }
       ],
       "expo-sharing",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-video"
     ],
     "scheme": "tathirquran",
     "experiments": {
