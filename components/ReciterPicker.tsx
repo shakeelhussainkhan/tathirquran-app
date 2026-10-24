@@ -30,7 +30,7 @@ export default function ReciterPicker({
             activeOpacity={0.7}
           >
             <Text style={[styles.rowLabel, { color: theme.text }]}>{reciter.name}</Text>
-            {selected.id === reciter.id && <Text style={[styles.checkmark, { color: theme.gold }]}>✓</Text>}
+            {selected.id === reciter.id && <Text style={[styles.checkmark, { color: theme.goldText }]}>✓</Text>}
           </TouchableOpacity>
         ))}
       </View>
@@ -82,8 +82,8 @@ const styles = StyleSheet.create({
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   pillActive: { paddingVertical: 5, paddingHorizontal: 14, borderRadius: 2 },
   pillInactive: { borderWidth: 0.5, paddingVertical: 5, paddingHorizontal: 14, borderRadius: 2 },
-  pillTextActive: { color: '#fff', fontSize: 9, letterSpacing: 1 },
-  pillTextInactive: { fontSize: 9, letterSpacing: 1 },
+  pillTextActive: { color: '#fff', fontSize: 11, letterSpacing: 1 },
+  pillTextInactive: { fontSize: 11, letterSpacing: 1 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -315,9 +315,9 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     },
     headerTitle: {
       fontFamily: 'Amiri_400Regular',
-      fontSize: 10,
+      fontSize: 11,
       letterSpacing: 3,
-      color: theme.gold,
+      color: theme.goldText,
       textAlign: 'center',
     },
     centered: {
@@ -440,7 +440,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     },
     centerLabel: {
       fontFamily: 'Amiri_400Regular',
-      fontSize: 8,
+      fontSize: 11,
       letterSpacing: 2,
       color: theme.textSecondary,
     },

@@ -181,7 +181,7 @@ export default function SearchScreen() {
         style={[styles.card, { borderColor: theme.border, backgroundColor: theme.bgCard }]}
         onPress={() => router.push(`/ayah/${item.surahNumber}/${item.ayahNumber}` as any)}
       >
-        <Text style={[styles.ref, { color: theme.gold }]}>
+        <Text style={[styles.ref, { color: theme.goldText }]}>
           {ref}
           {item.surahNameEnglish ? ` · ${item.surahNameEnglish}` : ''}
         </Text>
@@ -257,7 +257,7 @@ export default function SearchScreen() {
             onPress={() => router.push(`/read?mode=surah&surah=${entry.number}` as any)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.surahNumber, { color: theme.gold }]}>
+            <Text style={[styles.surahNumber, { color: theme.goldText }]}>
               {entry.number}
             </Text>
             <View style={{ flex: 1 }}>
@@ -287,7 +287,7 @@ export default function SearchScreen() {
       <View style={[styles.goldBar, { backgroundColor: theme.bronze }]} />
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <View style={{ width: 60 }} />
-        <Text style={[styles.title, { color: theme.gold }]}>SEARCH</Text>
+        <Text style={[styles.title, { color: theme.goldText }]}>SEARCH</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 0.5,
   },
-  title: { fontFamily: 'Amiri_400Regular', fontSize: 10, letterSpacing: 3 },
+  title: { fontFamily: 'Amiri_400Regular', fontSize: 11, letterSpacing: 3 },
   searchBoxWrap: { padding: 16, paddingBottom: 8 },
   input: {
     fontSize: 15,
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
   list: { padding: 16, paddingTop: 4, gap: 12 },
   count: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     marginBottom: 12,
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
   arabic: {
     fontFamily: 'Amiri_700Bold',
     fontSize: 20,
-    lineHeight: 34,
+    lineHeight: 40,
     textAlign: 'right',
     writingDirection: 'rtl',
   },
@@ -445,12 +445,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Amiri_400Regular',
     fontSize: 14,
     fontStyle: 'italic',
-    lineHeight: 21,
+    lineHeight: 26,
   },
   translationRtl: { textAlign: 'right', writingDirection: 'rtl' },
   scholar: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 9,
+    fontSize: 11,
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginTop: 3,

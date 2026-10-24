@@ -3,6 +3,11 @@ import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { AZAN_NOTIFICATION_SOUND } from './azan';
+import {
+  getQuoteForDate,
+  quoteAttribution,
+  NAHJUL_BALAGHA_TRANSLATOR,
+} from './nahjulBalagha';
 import { localGetAyah, localGetScheduleAyahId } from './offlineDb';
 import { calculatePrayerTimes } from './prayerTimes';
 import { getDefaultTranslation } from './queries';
@@ -26,13 +31,30 @@ import { supabase } from './supabase';
  * left untouched by this module.
  *
  * iOS PENDING-NOTIFICATION BUDGET: iOS keeps only the soonest 64
- * pending local notifications per app. Worst case here:
- *   morning verse 14 + azan 9 days x 5 prayers (45) + legacy daily
- *   repeating reminder (1) = 60 <= 64. When the morning verse is off,
- *   the azan window extends to 12 days (60 + 1 = 61 <= 64).
+ * pending local notifications per app. Verse reminders are capped at
+ * 21 pending by construction (see VERSE_REMINDER_WINDOW_DAYS), and
+ * the azan window shrinks as the verse-reminder count grows:
+ *   verse off (0)          + azan 12 days x 5 (60) + legacy (1) = 61
+ *   morning (14 x 1 = 14)  + azan  9 days x 5 (45) + legacy (1) = 60
+ *   morning+evening (10x2) + azan  8 days x 5 (40) + legacy (1) = 61
+ *   few (7 x 3 = 21)       + azan  8 days x 5 (40) + legacy (1) = 62
+ * all <= 64.
+ *
+ * VERSE REMINDER FREQUENCY (v1.0.5, Saira): the v1.0.4 morning-verse
+ * on/off toggle grew into a frequency — 'off' | 'morning' |
+ * 'morning_evening' | 'few' — stored under VERSE_REMINDER_KEY and
+ * migrated once from the legacy boolean (see
+ * getVerseReminderFrequency). Slots: morning = the day's verse at
+ * Fajr (the original #7 behaviour, identifier/content unchanged);
+ * evening = Maghrib, a return to the SAME day's verse; midday
+ * ('few' only) = Dhuhr, the day's Nahjul Balagha saying — titled
+ * "From Nahjul Balagha" and attributed in the body, never presented
+ * as Quran. All verse-reminder identifiers keep the `mv-` prefix, so
+ * the wipe-and-rebuild in refreshPrayerAlerts covers every slot.
  */
 
 const MORNING_VERSE_KEY = 'morning_verse_enabled';
+const VERSE_REMINDER_KEY = 'verse_reminder_frequency';
 const AZAN_ALERTS_KEY = 'azan_alerts_enabled';
 const COORDS_KEY = 'user_coords';
 
@@ -42,7 +64,17 @@ const AZAN_ID_PREFIX = 'azan-';
 const MORNING_CHANNEL_ID = 'morning-verse';
 const AZAN_CHANNEL_ID = 'azan';
 
-const MORNING_WINDOW_DAYS = 14;
+/**
+ * Rolling window per frequency. Days x slots-per-day keeps pending
+ * verse reminders at or under 21: morning 14x1, morning+evening 10x2,
+ * few 7x3.
+ */
+const VERSE_REMINDER_WINDOW_DAYS: Record<VerseReminderFrequency, number> = {
+  off: 0,
+  morning: 14,
+  morning_evening: 10,
+  few: 7,
+};
 const FUTURE_BUFFER_MS = 30_000;
 
 export const AZAN_PRAYERS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const;
@@ -69,15 +101,53 @@ export interface RefreshResult {
 }
 
 /* ---------------------------------------------------------------
- * Settings flags (both default OFF)
+ * Settings flags. Azan alerts default OFF. Verse reminders are a
+ * frequency (v1.0.5) migrated once from the legacy morning-verse
+ * boolean: legacy off -> 'off'; legacy on -> 'morning'; never set ->
+ * 'morning' when notification permission is already granted (the
+ * morning verse is the default experience), otherwise 'off'. The
+ * migrated value is written back so the resolution happens once.
  * ------------------------------------------------------------- */
 
+export type VerseReminderFrequency = 'off' | 'morning' | 'morning_evening' | 'few';
+
+function isVerseReminderFrequency(v: string | null): v is VerseReminderFrequency {
+  return v === 'off' || v === 'morning' || v === 'morning_evening' || v === 'few';
+}
+
+export async function getVerseReminderFrequency(): Promise<VerseReminderFrequency> {
+  const stored = await AsyncStorage.getItem(VERSE_REMINDER_KEY);
+  if (isVerseReminderFrequency(stored)) return stored;
+
+  const legacy = await AsyncStorage.getItem(MORNING_VERSE_KEY);
+  let migrated: VerseReminderFrequency;
+  if (legacy === 'true') {
+    migrated = 'morning';
+  } else if (legacy === 'false') {
+    migrated = 'off';
+  } else {
+    const permissions = await Notifications.getPermissionsAsync();
+    migrated = permissions.granted ? 'morning' : 'off';
+  }
+  await AsyncStorage.setItem(VERSE_REMINDER_KEY, migrated);
+  return migrated;
+}
+
+export async function setVerseReminderFrequency(
+  frequency: VerseReminderFrequency,
+): Promise<void> {
+  await AsyncStorage.setItem(VERSE_REMINDER_KEY, frequency);
+  // Keep the legacy boolean in step for anything still reading it.
+  await AsyncStorage.setItem(MORNING_VERSE_KEY, frequency === 'off' ? 'false' : 'true');
+}
+
+/** Legacy boolean view of the frequency (kept for API stability). */
 export async function getMorningVerseEnabled(): Promise<boolean> {
-  return (await AsyncStorage.getItem(MORNING_VERSE_KEY)) === 'true';
+  return (await getVerseReminderFrequency()) !== 'off';
 }
 
 export async function setMorningVerseEnabled(on: boolean): Promise<void> {
-  await AsyncStorage.setItem(MORNING_VERSE_KEY, on ? 'true' : 'false');
+  await setVerseReminderFrequency(on ? 'morning' : 'off');
 }
 
 export async function getAzanAlertsEnabled(): Promise<boolean> {
@@ -257,43 +327,113 @@ async function cancelWave3Scheduled(): Promise<void> {
   );
 }
 
-async function scheduleMorningVerse(coords: Coords): Promise<number> {
+async function scheduleVerseReminder(
+  identifier: string,
+  title: string,
+  body: string,
+  at: Date,
+  data: Record<string, string>,
+): Promise<void> {
+  const trigger: Notifications.DateTriggerInput = {
+    type: Notifications.SchedulableTriggerInputTypes.DATE,
+    date: at,
+  };
+  if (Platform.OS === 'android') trigger.channelId = MORNING_CHANNEL_ID;
+  await Notifications.scheduleNotificationAsync({
+    identifier,
+    content: { title, body, sound: 'default', data },
+    trigger,
+  });
+}
+
+/**
+ * Schedule the verse reminders for the chosen frequency over its
+ * rolling window. The morning slot is the original v1.0.4 #7
+ * behaviour, byte-identical in identifier and content. The evening
+ * slot re-presents the SAME day's verse (resolved with the morning's
+ * date key, exactly what Today showed that day); the midday slot
+ * carries the day's Nahjul Balagha saying, labelled as such.
+ */
+async function scheduleVerseReminders(
+  coords: Coords,
+  frequency: VerseReminderFrequency,
+): Promise<number> {
+  const days = VERSE_REMINDER_WINDOW_DAYS[frequency];
   const now = Date.now();
   let scheduled = 0;
-  for (let i = 0; i < MORNING_WINDOW_DAYS; i++) {
+  for (let i = 0; i < days; i++) {
     const day = addDays(startOfToday(), i);
     const times = calculatePrayerTimes(coords.latitude, coords.longitude, day);
-    const fajr = times.fajr;
-    if (fajr.getTime() <= now + FUTURE_BUFFER_MS) continue;
 
-    const dateKey = utcDateKey(fajr);
-    const verse = await resolveVerse(dateKey);
-    if (!verse) continue;
-
-    const trigger: Notifications.DateTriggerInput = {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: fajr,
+    // Resolved lazily, once per day, shared by the morning/evening slots.
+    let verse: VerseContent | null | undefined;
+    const dayVerse = async (): Promise<VerseContent | null> => {
+      if (verse === undefined) verse = await resolveVerse(utcDateKey(times.fajr));
+      return verse;
     };
-    if (Platform.OS === 'android') trigger.channelId = MORNING_CHANNEL_ID;
 
-    await Notifications.scheduleNotificationAsync({
-      identifier: `${MORNING_ID_PREFIX}${dateKey}`,
-      content: {
-        title: `Today's Verse — ${verse.surahName} ${verse.surahNumber}:${verse.ayahNumber}`,
-        body: verse.translationText,
-        sound: 'default',
-        data: { type: 'morning-verse', dateKey },
-      },
-      trigger,
-    });
-    scheduled++;
+    // Morning — Fajr, the day's verse.
+    if (times.fajr.getTime() > now + FUTURE_BUFFER_MS) {
+      const v = await dayVerse();
+      if (v) {
+        await scheduleVerseReminder(
+          `${MORNING_ID_PREFIX}${utcDateKey(times.fajr)}`,
+          `Today's Verse — ${v.surahName} ${v.surahNumber}:${v.ayahNumber}`,
+          v.translationText,
+          times.fajr,
+          { type: 'morning-verse', dateKey: utcDateKey(times.fajr) },
+        );
+        scheduled++;
+      }
+    }
+
+    // Midday ('few' only) — Dhuhr, the day's Nahjul Balagha saying.
+    // The quote is keyed on the Dhuhr instant, matching what the app
+    // shows at that moment (getQuoteForDate reads the UTC day).
+    if (frequency === 'few' && times.dhuhr.getTime() > now + FUTURE_BUFFER_MS) {
+      const quote = getQuoteForDate(times.dhuhr);
+      if (quote) {
+        await scheduleVerseReminder(
+          `${MORNING_ID_PREFIX}mid-${localDateKey(day)}`,
+          'From Nahjul Balagha',
+          `"${quote.text}"\n${quoteAttribution(quote)}\n${NAHJUL_BALAGHA_TRANSLATOR}`,
+          times.dhuhr,
+          { type: 'nahjul-balagha', slot: 'midday' },
+        );
+        scheduled++;
+      }
+    }
+
+    // Evening — Maghrib, a return to the same day's verse.
+    if (frequency !== 'morning' && times.maghrib.getTime() > now + FUTURE_BUFFER_MS) {
+      const v = await dayVerse();
+      if (v) {
+        await scheduleVerseReminder(
+          `${MORNING_ID_PREFIX}eve-${localDateKey(day)}`,
+          `Return to Today's Verse — ${v.surahName} ${v.surahNumber}:${v.ayahNumber}`,
+          v.translationText,
+          times.maghrib,
+          { type: 'morning-verse', slot: 'evening', dateKey: utcDateKey(times.fajr) },
+        );
+        scheduled++;
+      }
+    }
   }
   return scheduled;
 }
 
-function azanWindowDays(morningEnabled: boolean): number {
-  // See the iOS 64-notification budget note at the top of this file.
-  return morningEnabled ? 9 : 12;
+function azanWindowDays(frequency: VerseReminderFrequency): number {
+  // See the iOS 64-notification budget note at the top of this file:
+  // the azan window shrinks as the verse-reminder count grows.
+  switch (frequency) {
+    case 'off':
+      return 12;
+    case 'morning':
+      return 9;
+    case 'morning_evening':
+    case 'few':
+      return 8;
+  }
 }
 
 async function scheduleAzanAlerts(coords: Coords, days: number): Promise<number> {
@@ -339,13 +479,14 @@ async function scheduleAzanAlerts(coords: Coords, days: number): Promise<number>
 export async function refreshPrayerAlerts(): Promise<RefreshResult> {
   const empty: RefreshResult = { morningScheduled: 0, azanScheduled: 0, needsLocation: false };
   try {
-    const [morningOn, azanOn] = await Promise.all([
-      getMorningVerseEnabled(),
+    const [frequency, azanOn] = await Promise.all([
+      getVerseReminderFrequency(),
       getAzanAlertsEnabled(),
     ]);
+    const verseOn = frequency !== 'off';
 
     await cancelWave3Scheduled();
-    if (!morningOn && !azanOn) return empty;
+    if (!verseOn && !azanOn) return empty;
 
     const permissions = await Notifications.getPermissionsAsync();
     if (!permissions.granted) return empty;
@@ -355,9 +496,12 @@ export async function refreshPrayerAlerts(): Promise<RefreshResult> {
 
     await ensureAndroidChannels();
 
-    const morningScheduled = morningOn ? await scheduleMorningVerse(coords) : 0;
+    // morningScheduled reports all verse-reminder slots scheduled.
+    const morningScheduled = verseOn
+      ? await scheduleVerseReminders(coords, frequency)
+      : 0;
     const azanScheduled = azanOn
-      ? await scheduleAzanAlerts(coords, azanWindowDays(morningOn))
+      ? await scheduleAzanAlerts(coords, azanWindowDays(frequency))
       : 0;
 
     return { morningScheduled, azanScheduled, needsLocation: false };

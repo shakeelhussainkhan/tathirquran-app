@@ -68,7 +68,7 @@ export default function AboutScreen() {
             <View key={i} style={[styles.tableRow, i % 2 === 1 && styles.tableRowAlt]}>
               <Text style={styles.tableCell}>{s.lang}</Text>
               <Text style={[styles.tableCell, { flex: 2 }]}>{s.name}</Text>
-              <Text style={[styles.tableCell, { color: s.status === 'Live' ? Colors.bronze : Colors.inkSoft }]}>
+              <Text style={[styles.tableCell, { color: s.status === 'Live' ? Colors.bronzeDark : Colors.inkSoft }]}>
                 {s.status === 'Live' ? '✓ Live' : '⏳'}
               </Text>
             </View>
@@ -118,10 +118,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.parchment },
   goldBar: { height: 4, backgroundColor: Colors.bronzeDark },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 0.5, borderBottomColor: Colors.bronzeSubtle },
-  back: { fontFamily: 'Amiri_400Regular', fontSize: 14, color: Colors.bronze, width: 60 },
-  title: { fontFamily: 'Amiri_400Regular', fontSize: 10, letterSpacing: 3, color: Colors.bronze },
+  back: { fontFamily: 'Amiri_400Regular', fontSize: 14, color: Colors.bronzeDark, width: 60 },
+  title: { fontFamily: 'Amiri_400Regular', fontSize: 11, letterSpacing: 3, color: Colors.bronzeDark },
   body: { padding: 24, paddingBottom: 48 },
-  sectionLabel: { fontFamily: 'Amiri_400Regular', fontSize: 9, color: Colors.bronze, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 12 },
+  sectionLabel: { fontFamily: 'Amiri_400Regular', fontSize: 11, color: Colors.bronzeDark, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 12 },
   desc: { fontFamily: 'Amiri_400Regular', fontSize: 16, color: Colors.inkMid, lineHeight: 26, marginBottom: 10 },
   divider: { height: 0.5, backgroundColor: Colors.bronzeSubtle, marginVertical: 24 },
   table: { borderWidth: 0.5, borderColor: Colors.bronzeSubtle, borderRadius: 2, overflow: 'hidden' },
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
   headerCell: { color: Colors.parchment, fontWeight: '600' },
   name: { fontFamily: 'Amiri_400Regular', fontSize: 18, color: Colors.ink, marginBottom: 2 },
   sub: { fontFamily: 'Amiri_400Regular', fontSize: 13, color: Colors.inkSoft, marginBottom: 12 },
-  email: { fontFamily: 'Amiri_400Regular', fontSize: 15, color: Colors.bronze, letterSpacing: 0.5 },
+  email: { fontFamily: 'Amiri_400Regular', fontSize: 15, color: Colors.bronzeDark, letterSpacing: 0.5 },
   creditText: { fontFamily: 'Amiri_400Regular', fontSize: 14, color: Colors.inkMid, lineHeight: 22, marginTop: 16, marginBottom: 6 },
   version: { fontFamily: 'Amiri_400Regular', fontSize: 12, color: Colors.inkSoft, textAlign: 'center', marginTop: 4 },
   fatihaSection: {

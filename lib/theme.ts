@@ -8,6 +8,9 @@ export const lightTheme = {
   text: '#1a1205',
   textSecondary: '#5a3a10',
   gold: '#c9a227',
+  // Text-grade gold: dark enough to read at small sizes on parchment
+  // (#c9a227 itself is decorative — headings, borders, ornaments only).
+  goldText: '#8b6520',
   bronze: '#8b6520',
   border: 'rgba(201,162,39,0.2)',
   barColor: '#c9a227',
@@ -19,6 +22,7 @@ export const darkTheme = {
   text: '#f5e8c8',
   textSecondary: '#c9a227',
   gold: '#e8c96a',
+  goldText: '#e8c96a',
   bronze: '#c9a227',
   border: 'rgba(201,162,39,0.2)',
   barColor: '#c9a227',

@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import { useEventListener } from 'expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Colors } from '../constants/colors';
 
 /**
  * Launch intro — the animated Tathir emblem with the spoken name
@@ -48,7 +47,7 @@ export default function LaunchIntro({ onDone }: { onDone: () => void }) {
       <VideoView
         player={player}
         style={styles.video}
-        contentFit="cover"
+        contentFit="contain"
         nativeControls={false}
         allowsPictureInPicture={false}
       />
@@ -63,7 +62,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: Colors.parchment,
+    // Matches the portrait intro asset's own backdrop colour exactly, so
+    // the contain letterbox is invisible.
+    backgroundColor: '#f3efe1',
     zIndex: 999,
   },
   video: {

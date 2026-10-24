@@ -21,10 +21,11 @@ import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-au
 import {
   ensureCoordsInteractive,
   getAzanAlertsEnabled,
-  getMorningVerseEnabled,
+  getVerseReminderFrequency,
   refreshPrayerAlerts,
   setAzanAlertsEnabled,
-  setMorningVerseEnabled,
+  setVerseReminderFrequency,
+  type VerseReminderFrequency,
 } from '../lib/prayerAlerts';
 import { getOfflineSyncStatus, syncOfflineData, type OfflineSyncStatus } from '../lib/offlineDb';
 import ReciterPicker from '../components/ReciterPicker';
@@ -67,7 +68,7 @@ export default function SettingsScreen() {
   const [showTransliteration, setShowTransliteration] = useState(false);
   const [notifEnabled, setNotifEnabled] = useState(false);
   const [notifHour, setNotifHour] = useState(7);
-  const [morningVerseOn, setMorningVerseOn] = useState(false);
+  const [verseFrequency, setVerseFrequency] = useState<VerseReminderFrequency>('off');
   const [azanAlertsOn, setAzanAlertsOn] = useState(false);
   const azanPlayer = useAudioPlayer(AZAN_PLAYBACK_ASSET);
   const azanStatus = useAudioPlayerStatus(azanPlayer);
@@ -102,7 +103,7 @@ export default function SettingsScreen() {
       const notif = await getNotificationSettings();
       setNotifEnabled(notif.enabled);
       setNotifHour(notif.hour);
-      setMorningVerseOn(await getMorningVerseEnabled());
+      setVerseFrequency(await getVerseReminderFrequency());
       setAzanAlertsOn(await getAzanAlertsEnabled());
       setStreak(await getStreakState());
       setReciter(await getSelectedReciter());
@@ -245,18 +246,27 @@ export default function SettingsScreen() {
     return true;
   };
 
-  const toggleMorningVerse = async (val: boolean) => {
-    if (val) {
-      setMorningVerseOn(true);
+  const VERSE_FREQUENCY_OPTIONS: { value: VerseReminderFrequency; label: string }[] = [
+    { value: 'off', label: 'Off' },
+    { value: 'morning', label: 'Morning only' },
+    { value: 'morning_evening', label: 'Morning + evening' },
+    { value: 'few', label: 'A few times a day' },
+  ];
+
+  const changeVerseFrequency = async (next: VerseReminderFrequency) => {
+    if (next === verseFrequency) return;
+    if (next !== 'off') {
+      // Turning reminders on (or up) needs the same prerequisites as
+      // the v1.0.4 toggle: permission + a stored location. On failure
+      // the selection stays where it was.
+      setVerseFrequency(next);
       if (!(await enablePrayerAlertPrereqs())) {
-        setMorningVerseOn(false);
+        setVerseFrequency(await getVerseReminderFrequency());
         return;
       }
-      await setMorningVerseEnabled(true);
-    } else {
-      setMorningVerseOn(false);
-      await setMorningVerseEnabled(false);
     }
+    setVerseFrequency(next);
+    await setVerseReminderFrequency(next);
     await refreshPrayerAlerts();
   };
 
@@ -438,17 +448,22 @@ export default function SettingsScreen() {
           </View>
         )}
 
-        <View style={s.row}>
-          <Text style={s.rowLabel}>Morning verse on lock screen</Text>
-          <Switch
-            value={morningVerseOn}
-            onValueChange={toggleMorningVerse}
-            trackColor={{ false: 'rgba(139,101,32,0.2)', true: theme.gold }}
-            thumbColor={theme.bg}
-          />
-        </View>
+        <Text style={s.rowGroupLabel}>Verse reminders</Text>
+        {VERSE_FREQUENCY_OPTIONS.map((option) => (
+          <TouchableOpacity
+            key={option.value}
+            style={s.row}
+            onPress={() => void changeVerseFrequency(option.value)}
+            activeOpacity={0.7}
+          >
+            <Text style={s.rowLabel}>{option.label}</Text>
+            {verseFrequency === option.value && (
+              <Text style={{ color: theme.goldText, fontSize: 14 }}>✓</Text>
+            )}
+          </TouchableOpacity>
+        ))}
         <Text style={s.syncNote}>
-          Shows the day's verse in full on your lock screen at Fajr — the first thing you see on waking.
+          The day's verse on your lock screen at Fajr. “Morning + evening” brings it back at Maghrib; “A few times a day” also adds the day's Nahjul Balagha saying at Dhuhr, clearly labelled as Nahjul Balagha.
         </Text>
 
         <View style={s.row}>
@@ -692,15 +707,15 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     },
     headerTitle: {
       fontFamily: 'Amiri_400Regular',
-      fontSize: 10,
+      fontSize: 11,
       letterSpacing: 3,
-      color: theme.gold,
+      color: theme.goldText,
       textAlign: 'center',
     },
     sectionHeader: {
       fontFamily: 'Amiri_400Regular',
-      fontSize: 10,
-      color: theme.gold,
+      fontSize: 11,
+      color: theme.goldText,
       letterSpacing: 2,
       textTransform: 'uppercase',
       paddingHorizontal: 20,
@@ -740,11 +755,11 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     rowLink: {
       fontFamily: 'Amiri_400Regular',
       fontSize: 13,
-      color: theme.gold,
+      color: theme.goldText,
     },
     checkmark: {
       fontSize: 14,
-      color: theme.gold,
+      color: theme.goldText,
     },
     streakNote: {
       fontFamily: 'Amiri_400Regular',
@@ -799,7 +814,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     azanPlayLabel: {
       fontFamily: 'Amiri_400Regular',
       fontSize: 13,
-      color: theme.gold,
+      color: theme.goldText,
       letterSpacing: 0.5,
     },
     azanStopLabel: {
@@ -822,7 +837,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     },
     creditsSmall: {
       fontFamily: 'Amiri_400Regular',
-      fontSize: 10,
+      fontSize: 11,
       color: theme.textSecondary,
       textAlign: 'center',
       opacity: 0.7,

@@ -24,7 +24,7 @@ export default function DevotionalCard({
       onPress={() => router.push(`/devotional/${devotional.slug}`)}
       activeOpacity={0.7}
     >
-      <Text style={[styles.label, { color: theme.gold }]}>{label}</Text>
+      <Text style={[styles.label, { color: theme.goldText }]}>{label}</Text>
       <View style={styles.row}>
         <Text style={[styles.title, { color: theme.bronze, flex: 1 }]}>{devotional.title}</Text>
         <Text style={[styles.chevron, { color: theme.bronze }]}>→</Text>
@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     marginBottom: 2,

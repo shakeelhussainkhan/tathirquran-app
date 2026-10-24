@@ -90,9 +90,9 @@ export default function ArchiveScreen() {
       <View style={[styles.goldBar, { backgroundColor: theme.bronze }]} />
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={[styles.back, { color: theme.gold }]}>← Today</Text>
+          <Text style={[styles.back, { color: theme.goldText }]}>← Today</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.gold }]}>ARCHIVE</Text>
+        <Text style={[styles.title, { color: theme.goldText }]}>ARCHIVE</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -102,7 +102,7 @@ export default function ArchiveScreen() {
           style={[styles.tabBtn, tab === 'archive' && [styles.tabBtnActive, { borderBottomColor: theme.gold }]]}
           onPress={() => setTab('archive')}
         >
-          <Text style={[styles.tabBtnText, { color: tab === 'archive' ? theme.gold : theme.textSecondary }]}>
+          <Text style={[styles.tabBtnText, { color: tab === 'archive' ? theme.goldText : theme.textSecondary }]}>
             ARCHIVE
           </Text>
         </TouchableOpacity>
@@ -110,7 +110,7 @@ export default function ArchiveScreen() {
           style={[styles.tabBtn, tab === 'bookmarks' && [styles.tabBtnActive, { borderBottomColor: theme.gold }]]}
           onPress={() => setTab('bookmarks')}
         >
-          <Text style={[styles.tabBtnText, { color: tab === 'bookmarks' ? theme.gold : theme.textSecondary }]}>
+          <Text style={[styles.tabBtnText, { color: tab === 'bookmarks' ? theme.goldText : theme.textSecondary }]}>
             BOOKMARKS {bookmarks.length > 0 ? `(${bookmarks.length})` : ''}
           </Text>
         </TouchableOpacity>
@@ -118,7 +118,7 @@ export default function ArchiveScreen() {
           style={[styles.tabBtn, tab === 'notes' && [styles.tabBtnActive, { borderBottomColor: theme.gold }]]}
           onPress={() => setTab('notes')}
         >
-          <Text style={[styles.tabBtnText, { color: tab === 'notes' ? theme.gold : theme.textSecondary }]}>
+          <Text style={[styles.tabBtnText, { color: tab === 'notes' ? theme.goldText : theme.textSecondary }]}>
             MY NOTES {notesWithText.length > 0 ? `(${notesWithText.length})` : ''}
           </Text>
         </TouchableOpacity>
@@ -126,7 +126,7 @@ export default function ArchiveScreen() {
           style={[styles.tabBtn, tab === 'memorized' && [styles.tabBtnActive, { borderBottomColor: theme.gold }]]}
           onPress={() => setTab('memorized')}
         >
-          <Text style={[styles.tabBtnText, { color: tab === 'memorized' ? theme.gold : theme.textSecondary }]}>
+          <Text style={[styles.tabBtnText, { color: tab === 'memorized' ? theme.goldText : theme.textSecondary }]}>
             MEMORIZED {memorized.length > 0 ? `(${memorized.length})` : ''}
           </Text>
         </TouchableOpacity>
@@ -146,7 +146,7 @@ export default function ArchiveScreen() {
                 onPress={() => router.push(`/ayah/${item.ayahs?.surah_number}/${item.ayahs?.ayah_number}` as any)}
               >
                 <Text style={[styles.rowDate, { color: theme.textSecondary }]}>{item.schedule_date}</Text>
-                <Text style={[styles.rowSurah, { color: theme.gold }]}>
+                <Text style={[styles.rowSurah, { color: theme.goldText }]}>
                   {item.ayahs?.surahs?.name_english} {item.ayahs?.surah_number}:{item.ayahs?.ayah_number}
                 </Text>
                 <Text style={[styles.rowArabic, { color: theme.text }]} numberOfLines={1}>
@@ -172,7 +172,7 @@ export default function ArchiveScreen() {
                 <View key={bm.key} style={{ borderBottomWidth: 0.5, borderBottomColor: theme.border }}>
                   <View style={[styles.row, { borderBottomWidth: 0 }]}>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.rowSurah, { color: theme.gold }]}>
+                      <Text style={[styles.rowSurah, { color: theme.goldText }]}>
                         {bm.surahName} {bm.surah}:{bm.ayah}
                       </Text>
                       <Text style={[styles.rowArabic, { color: theme.text }]} numberOfLines={1}>
@@ -184,7 +184,7 @@ export default function ArchiveScreen() {
                         </Text>
                       ) : null}
                       {entry && (entry.note || entry.tags.length > 0) ? (
-                        <Text style={[styles.bmTranslation, { color: theme.gold }]} numberOfLines={2}>
+                        <Text style={[styles.bmTranslation, { color: theme.goldText }]} numberOfLines={2}>
                           ✎ {entry.note ? entry.note : entry.tags.map(t => `#${t}`).join(' ')}
                         </Text>
                       ) : null}
@@ -221,7 +221,7 @@ export default function ArchiveScreen() {
             memorized.map(m => (
               <View key={m.key} style={[styles.row, { borderBottomColor: theme.border }]}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowSurah, { color: theme.gold }]}>
+                  <Text style={[styles.rowSurah, { color: theme.goldText }]}>
                     ✓ {m.surahName ? `${m.surahName} ` : ''}{m.surah}:{m.ayah}
                   </Text>
                   {m.arabic ? (
@@ -262,7 +262,7 @@ export default function ArchiveScreen() {
                     onPress={() => setExpandedKey(expanded ? null : rowKey)}
                   >
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.rowSurah, { color: theme.gold }]}>
+                      <Text style={[styles.rowSurah, { color: theme.goldText }]}>
                         {surahName ? `${surahName} ` : `Surah `}{e.surah}:{e.ayah}
                       </Text>
                       {arabic ? (
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
   },
   back: { fontFamily: 'Amiri_400Regular', fontSize: 14, width: 60 },
-  title: { fontFamily: 'Amiri_400Regular', fontSize: 10, letterSpacing: 3 },
+  title: { fontFamily: 'Amiri_400Regular', fontSize: 11, letterSpacing: 3 },
   tabRow: {
     flexDirection: 'row',
     borderBottomWidth: 0.5,
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   tabBtnActive: {},
   tabBtnText: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 9,
+    fontSize: 11,
     letterSpacing: 2,
   },
   row: { padding: 16, borderBottomWidth: 0.5, flexDirection: 'row', alignItems: 'center' },
@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Amiri_400Regular',
     fontSize: 12,
     fontStyle: 'italic',
-    lineHeight: 18,
+    lineHeight: 22,
     marginTop: 4,
   },
   removeBtn: {

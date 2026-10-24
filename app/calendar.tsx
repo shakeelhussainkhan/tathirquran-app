@@ -79,7 +79,7 @@ export default function CalendarScreen() {
           </Text>
         </View>
         {todayRow ? (
-          <Text style={[s.tag, { color: theme.gold }]}>TODAY</Text>
+          <Text style={[s.tag, { color: theme.goldText }]}>TODAY</Text>
         ) : nextRow ? (
           <Text style={[s.tag, { color: theme.bronze }]}>NEXT</Text>
         ) : o.ayah ? (
@@ -131,7 +131,7 @@ export default function CalendarScreen() {
             try again.
           </Text>
           <TouchableOpacity onPress={() => void refresh()} activeOpacity={0.7}>
-            <Text style={[s.retry, { color: theme.gold }]}>TRY AGAIN</Text>
+            <Text style={[s.retry, { color: theme.goldText }]}>TRY AGAIN</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -147,7 +147,7 @@ export default function CalendarScreen() {
               key={`banner-${o.hijriMonth}-${o.hijriDay}-${o.occasion}`}
               style={[s.todayBanner, { borderColor: theme.gold }]}
             >
-              <Text style={[s.todayBannerLabel, { color: theme.gold }]}>TODAY</Text>
+              <Text style={[s.todayBannerLabel, { color: theme.goldText }]}>TODAY</Text>
               <Text style={[s.todayBannerText, { color: theme.text }]}>{o.occasion}</Text>
             </View>
           ))}
@@ -183,8 +183,8 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
       borderBottomWidth: 0.5,
       borderBottomColor: theme.border,
     },
-    back: { fontFamily: 'Amiri_400Regular', fontSize: 14, width: 60, color: theme.gold },
-    title: { fontFamily: 'Amiri_400Regular', fontSize: 10, letterSpacing: 3, color: theme.gold },
+    back: { fontFamily: 'Amiri_400Regular', fontSize: 14, width: 60, color: theme.goldText },
+    title: { fontFamily: 'Amiri_400Regular', fontSize: 11, letterSpacing: 3, color: theme.goldText },
     center: {
       flex: 1,
       alignItems: 'center',
@@ -218,7 +218,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     },
     todayBannerLabel: {
       fontFamily: 'Amiri_400Regular',
-      fontSize: 9,
+      fontSize: 11,
       letterSpacing: 2,
       marginBottom: 4,
     },
@@ -229,8 +229,8 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     },
     monthHeader: {
       fontFamily: 'Amiri_400Regular',
-      fontSize: 10,
-      color: theme.gold,
+      fontSize: 11,
+      color: theme.goldText,
       letterSpacing: 2,
       paddingTop: 22,
       paddingBottom: 6,
@@ -251,7 +251,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     },
     occasionName: { fontFamily: 'Amiri_400Regular', fontSize: 14, lineHeight: 19 },
     occasionMeta: { fontFamily: 'Amiri_400Regular', fontSize: 11, marginTop: 2 },
-    tag: { fontFamily: 'Amiri_400Regular', fontSize: 9, letterSpacing: 1.5 },
+    tag: { fontFamily: 'Amiri_400Regular', fontSize: 11, letterSpacing: 1.5 },
     footnote: {
       fontFamily: 'Amiri_400Regular',
       fontSize: 11,

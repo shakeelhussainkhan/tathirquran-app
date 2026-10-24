@@ -203,8 +203,8 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
       borderBottomWidth: 0.5,
       borderBottomColor: theme.border,
     },
-    back: { fontFamily: 'Amiri_400Regular', fontSize: 14, width: 60, color: theme.gold },
-    title: { fontFamily: 'Amiri_400Regular', fontSize: 10, letterSpacing: 3, color: theme.gold },
+    back: { fontFamily: 'Amiri_400Regular', fontSize: 14, width: 60, color: theme.goldText },
+    title: { fontFamily: 'Amiri_400Regular', fontSize: 11, letterSpacing: 3, color: theme.goldText },
     center: {
       flex: 1,
       alignItems: 'center',

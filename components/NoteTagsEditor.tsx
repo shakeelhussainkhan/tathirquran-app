@@ -109,7 +109,7 @@ export default function NoteTagsEditor({ surah, ayah, theme, onChanged }: Props)
             <Text style={[styles.btnText, { color: theme.textSecondary }]}>DELETE</Text>
           </TouchableOpacity>
         ) : null}
-        {status ? <Text style={[styles.status, { color: theme.gold }]}>{status}</Text> : null}
+        {status ? <Text style={[styles.status, { color: theme.goldText }]}>{status}</Text> : null}
       </View>
 
       <Text style={[styles.heading, { color: theme.bronze, marginTop: 14 }]}>TAGS</Text>
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   },
   heading: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 2,
     marginBottom: 8,
   },
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   },
   btnRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' },
   btn: { borderWidth: 0.5, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 2 },
-  btnText: { fontSize: 9, letterSpacing: 2, fontFamily: 'Amiri_400Regular' },
+  btnText: { fontSize: 11, letterSpacing: 2, fontFamily: 'Amiri_400Regular' },
   status: { fontFamily: 'Amiri_400Regular', fontSize: 11, fontStyle: 'italic' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
   chip: { borderWidth: 0.5, borderRadius: 10, paddingVertical: 3, paddingHorizontal: 10 },

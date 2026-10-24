@@ -1,6 +1,6 @@
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Share,
+  ActivityIndicator, Share, Modal, Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -106,6 +106,10 @@ export default function HomeScreen() {
   const [downloadFailed, setDownloadFailed] = useState(false);
   const [khatmahState, setKhatmahState] = useState<KhatmahState | null>(null);
   const [khatmahSurahNames, setKhatmahSurahNames] = useState<string[]>([]);
+  // Today screen tabs (v1.0.5, Saira): the verse, the quote and the
+  // reading plan get one tab each instead of a single long scroll.
+  const [activeTab, setActiveTab] = useState<'quran' | 'quote' | 'plan'>('quran');
+  const [reciterModalOpen, setReciterModalOpen] = useState(false);
   const player = useAudioPlayer(null);
   const playerStatus = useAudioPlayerStatus(player);
   const currentAyahId = useRef<number | null>(null);
@@ -614,7 +618,75 @@ export default function HomeScreen() {
         <Text style={[styles.headerDate, { color: theme.textSecondary }]}>{hijri}</Text>
       </View>
 
-      <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={styles.scroll}>
+        {/* Streak — small and gentle; milestones celebrate, misses welcome */}
+        {streak && streak.current_streak > 0 && (
+          <View style={[styles.streakBox, { borderColor: theme.border, marginTop: 10, marginBottom: 4 }]}>
+            <Text style={[styles.streakText, { color: theme.bronze }]}>
+              ✦ {streakLabel(streak.current_streak)}
+              {streak.longest_streak > streak.current_streak
+                ? `  ·  Longest ${streak.longest_streak}`
+                : ''}
+            </Text>
+            {streakMilestone ? (
+              <>
+                <Text style={[styles.streakMilestone, { color: theme.goldText }]}>
+                  {streakMilestone.title}
+                </Text>
+                <Text style={[styles.streakMessage, { color: theme.textSecondary }]}>
+                  {streakMilestone.message}
+                </Text>
+              </>
+            ) : streakReturned ? (
+              <Text style={[styles.streakMessage, { color: theme.textSecondary }]}>
+                {WELCOME_BACK_MESSAGE}
+              </Text>
+            ) : null}
+          </View>
+        )}
+
+        {/* Prayer times strip */}
+        {prayerTimes && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.prayerStrip, { width: 'auto', marginHorizontal: 20 }]}>
+            {[
+              { name: 'Fajr', time: prayerTimes.fajr },
+              { name: 'Sunrise', time: prayerTimes.sunrise },
+              { name: 'Dhuhr', time: prayerTimes.dhuhr },
+              { name: 'Asr', time: prayerTimes.asr },
+              { name: 'Maghrib', time: prayerTimes.maghrib },
+              { name: 'Isha', time: prayerTimes.isha },
+            ].map(p => (
+              <View key={p.name} style={styles.prayerItem}>
+                <Text style={styles.prayerName}>{p.name}</Text>
+                <Text style={[styles.prayerTime, { color: theme.goldText }]}>{formatTime(p.time)}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+
+      {/* Today tabs (v1.0.5, Saira): verse / quote / reading plan */}
+      <View style={[styles.tabBar, { borderColor: theme.border, backgroundColor: theme.bgCard }]}>
+        {([
+          { key: 'quran', label: 'Quran' },
+          { key: 'quote', label: 'Quote' },
+          { key: 'plan', label: 'Reading Plan' },
+        ] as const).map((tab) => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[styles.tabBtn, activeTab === tab.key && { backgroundColor: theme.bronze }]}
+            onPress={() => setActiveTab(tab.key)}
+            activeOpacity={0.7}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === tab.key }}
+          >
+            <Text style={[styles.tabText, { color: activeTab === tab.key ? '#fff' : theme.textSecondary }]}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={[styles.scroll, activeTab === 'quran' && { paddingRight: 64 }]}>
+        {activeTab === 'quran' && (<>
         {/* Bismillah */}
         {showBismillah && (
           <Text style={[styles.bismillah, { color: theme.bronze + '8C' }]}>
@@ -671,7 +743,7 @@ export default function HomeScreen() {
         )}
 
         {/* Reference */}
-        <Text style={[styles.ref, { color: theme.gold }]}>
+        <Text style={[styles.ref, { color: theme.goldText }]}>
           {ayah?.surahs?.name_english?.toUpperCase()} · {ayah?.surah_number}:{ayah?.ayah_number}
         </Text>
 
@@ -680,37 +752,6 @@ export default function HomeScreen() {
           {translation?.translations?.scholar_name}
         </Text>
 
-        {/* Daily Nahjul Balagha quote — bundled verbatim sayings (Ali Raza
-            translation, al-islam.org), deterministic by UTC date; see
-            lib/nahjulBalagha.ts. Below the verse, in its own panel. */}
-        {todayQuote && <NahjulBalaghaCard quote={todayQuote} />}
-
-        {/* Streak — small and gentle; milestones celebrate, misses welcome */}
-        {streak && streak.current_streak > 0 && (
-          <View style={[styles.streakBox, { borderColor: theme.border }]}>
-            <Text style={[styles.streakText, { color: theme.bronze }]}>
-              ✦ {streakLabel(streak.current_streak)}
-              {streak.longest_streak > streak.current_streak
-                ? `  ·  Longest ${streak.longest_streak}`
-                : ''}
-            </Text>
-            {streakMilestone ? (
-              <>
-                <Text style={[styles.streakMilestone, { color: theme.gold }]}>
-                  {streakMilestone.title}
-                </Text>
-                <Text style={[styles.streakMessage, { color: theme.textSecondary }]}>
-                  {streakMilestone.message}
-                </Text>
-              </>
-            ) : streakReturned ? (
-              <Text style={[styles.streakMessage, { color: theme.textSecondary }]}>
-                {WELCOME_BACK_MESSAGE}
-              </Text>
-            ) : null}
-          </View>
-        )}
-
         {/* Devotional cards — only when a matching devotional_texts row exists */}
         {devotionals?.occasionDevotional && (
           <DevotionalCard
@@ -718,96 +759,10 @@ export default function HomeScreen() {
             label="For today's occasion"
           />
         )}
-        {devotionals?.kumayl &&
-          isThursdayEvening(new Date(), prayerTimes?.maghrib ?? null) && (
-            <DevotionalCard
-              devotional={devotionals.kumayl}
-              label="Thursday evening · Laylat al-Jumu'ah"
-            />
-          )}
-
-        {/* Audio + Share + Bookmark row */}
-        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 8, marginBottom: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
-          <TouchableOpacity style={[styles.actionBtn, { borderColor: theme.border }]} onPress={toggleAudio} activeOpacity={0.7}>
-            <Text style={[styles.actionBtnText, { color: theme.bronze }]}>
-              {audioLoading ? 'LOADING...' : player.playing ? '⏸ PAUSE' : '▶ LISTEN'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, { borderColor: theme.border }]} onPress={handleShare} activeOpacity={0.7}>
-            <Text style={[styles.actionBtnText, { color: theme.bronze }]}>↑ SHARE</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, { borderColor: theme.border }]} onPress={handleShareCard} activeOpacity={0.7}>
-            <Text style={[styles.actionBtnText, { color: theme.bronze }]}>
-              {sharingCard ? 'MAKING CARD…' : '🖼 SHARE CARD'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, { borderColor: theme.border }]} onPress={toggleBookmark} activeOpacity={0.7}>
-            <Text style={[styles.actionBtnText, { color: bookmarked ? theme.gold : theme.bronze }]}>
-              {bookmarked ? '🔖 SAVED' : '🔖 SAVE'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionBtn, { borderColor: memorizeMode ? theme.gold : theme.border, backgroundColor: memorizeMode ? 'rgba(201,162,39,0.10)' : 'transparent' }]}
-            onPress={toggleMemorizeMode}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.actionBtnText, { color: memorizeMode ? theme.gold : theme.bronze }]}>
-              🧠 MEMORIZE
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Reciter — compact picker next to the audio controls */}
-        <ReciterPicker selected={reciter} onSelect={handleReciterChange} variant="chips" />
-
-        {/* Download this ayah's audio for offline listening */}
-        <View style={{ alignItems: 'center', marginTop: -4, marginBottom: 20 }}>
-          <TouchableOpacity
-            style={[styles.actionBtn, { borderColor: theme.border }]}
-            onPress={handleDownloadAudio}
-            disabled={downloadingAudio || audioDownloaded}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.actionBtnText, { color: audioDownloaded ? theme.gold : theme.bronze }]}>
-              {downloadingAudio
-                ? 'DOWNLOADING…'
-                : audioDownloaded
-                  ? '✓ DOWNLOADED — PLAYS OFFLINE'
-                  : '⬇ DOWNLOAD AUDIO'}
-            </Text>
-          </TouchableOpacity>
-          {downloadFailed && (
-            <Text style={[styles.downloadNote, { color: theme.textSecondary }]}>
-              Download failed — check your connection and try again.
-            </Text>
-          )}
-        </View>
-        {/* Khatmah reading plan card (only while a plan is active) */}
-        {khatmahState && (() => {
-          const progress = getKhatmahProgress(khatmahState);
-          if (!progress) return null;
-          return (
-            <KhatmahCard
-              progress={progress}
-              surahNames={khatmahSurahNames}
-              onMarkDone={handleKhatmahMarkDone}
-            />
-          );
-        })()}
-        {/* Personal note & tags (stored on this device only) */}
-        {ayah && (
-          <NoteTagsEditor
-            key={`${ayah.surah_number}_${ayah.ayah_number}`}
-            surah={ayah.surah_number}
-            ayah={ayah.ayah_number}
-            theme={theme}
-          />
-        )}
-
         {/* Memorization panel */}
         {memorizeMode && (
           <View style={[styles.memorizePanel, { borderColor: theme.border }]}>
-            <Text style={[styles.memorizeTitle, { color: theme.gold }]}>MEMORIZE THIS AYAH</Text>
+            <Text style={[styles.memorizeTitle, { color: theme.goldText }]}>MEMORIZE THIS AYAH</Text>
             <Text style={[styles.memorizeHint, { color: theme.textSecondary }]}>
               The translation is hidden first. Then hide the Arabic words little by little,
               recite from memory, and tap a hidden word — or Reveal — to check yourself.
@@ -852,7 +807,7 @@ export default function HomeScreen() {
             </View>
 
             {/* Repeat-audio loop */}
-            <Text style={[styles.memorizeTitle, { color: theme.gold, marginTop: 14 }]}>REPEAT RECITATION</Text>
+            <Text style={[styles.memorizeTitle, { color: theme.goldText, marginTop: 14 }]}>REPEAT RECITATION</Text>
             <View style={styles.memorizeRow}>
               {LOOP_COUNTS.map(n => (
                 <TouchableOpacity
@@ -871,7 +826,7 @@ export default function HomeScreen() {
             </View>
             {loopActive ? (
               <TouchableOpacity style={[styles.actionBtn, { borderColor: theme.gold }]} onPress={stopLoop} activeOpacity={0.7}>
-                <Text style={[styles.actionBtnText, { color: theme.gold }]}>
+                <Text style={[styles.actionBtnText, { color: theme.goldText }]}>
                   ■ STOP — PLAYING {Math.min(loopPlaysDone + 1, loopCount)} OF {loopCount}
                 </Text>
               </TouchableOpacity>
@@ -889,7 +844,7 @@ export default function HomeScreen() {
               onPress={toggleMemorized}
               activeOpacity={0.7}
             >
-              <Text style={[styles.actionBtnText, { color: memorized ? theme.gold : theme.bronze }]}>
+              <Text style={[styles.actionBtnText, { color: memorized ? theme.goldText : theme.bronze }]}>
                 {memorized ? '✓ MEMORIZED — TAP TO UNDO' : 'MARK AS MEMORIZED'}
               </Text>
             </TouchableOpacity>
@@ -925,48 +880,15 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Prayer times strip */}
-        {prayerTimes && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.prayerStrip}>
-            {[
-              { name: 'Fajr', time: prayerTimes.fajr },
-              { name: 'Sunrise', time: prayerTimes.sunrise },
-              { name: 'Dhuhr', time: prayerTimes.dhuhr },
-              { name: 'Asr', time: prayerTimes.asr },
-              { name: 'Maghrib', time: prayerTimes.maghrib },
-              { name: 'Isha', time: prayerTimes.isha },
-            ].map(p => (
-              <View key={p.name} style={styles.prayerItem}>
-                <Text style={styles.prayerName}>{p.name}</Text>
-                <Text style={[styles.prayerTime, { color: theme.gold }]}>{formatTime(p.time)}</Text>
-              </View>
-            ))}
-          </ScrollView>
+        {/* Personal note & tags (stored on this device only) */}
+        {ayah && (
+          <NoteTagsEditor
+            key={`${ayah.surah_number}_${ayah.ayah_number}`}
+            surah={ayah.surah_number}
+            ayah={ayah.ayah_number}
+            theme={theme}
+          />
         )}
-
-        {/* Qibla entry point */}
-        <TouchableOpacity
-          style={[styles.tafsirBtn, { borderColor: theme.border, marginTop: 10 }]}
-          onPress={() => router.push('/qibla')}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.tafsirBtnText, { color: theme.bronze, flex: 1 }]}>
-            🧭 QIBLA DIRECTION
-          </Text>
-          <Text style={[styles.tafsirChevron, { color: theme.bronze }]}>→</Text>
-        </TouchableOpacity>
-
-        {/* Family circle entry point */}
-        <TouchableOpacity
-          style={[styles.tafsirBtn, { borderColor: theme.border, marginTop: 10 }]}
-          onPress={() => router.push('/circles')}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.tafsirBtnText, { color: theme.bronze, flex: 1 }]}>
-            👥 FAMILY CIRCLE
-          </Text>
-          <Text style={[styles.tafsirChevron, { color: theme.bronze }]}>→</Text>
-        </TouchableOpacity>
 
         {/* Tafsir */}
         {scholars.length === 0 ? (
@@ -1024,7 +946,7 @@ export default function HomeScreen() {
                         onPress={() => toggleSpeech(allText)}
                         activeOpacity={0.7}
                       >
-                        <Text style={[styles.listenBtnText, { color: theme.gold }]}>
+                        <Text style={[styles.listenBtnText, { color: theme.goldText }]}>
                           {isSpeaking ? '■ STOP' : '🔊 LISTEN'}
                         </Text>
                       </TouchableOpacity>
@@ -1049,8 +971,160 @@ export default function HomeScreen() {
           </View>
         )}
 
+        </>)}
+        {activeTab === 'quote' && (<>
+        {/* Daily Nahjul Balagha quote — bundled verbatim sayings (Ali Raza
+            translation, al-islam.org), deterministic by UTC date; see
+            lib/nahjulBalagha.ts. Below the verse, in its own panel. */}
+        {todayQuote && <NahjulBalaghaCard quote={todayQuote} />}
+
+        {devotionals?.kumayl &&
+          isThursdayEvening(new Date(), prayerTimes?.maghrib ?? null) && (
+            <DevotionalCard
+              devotional={devotionals.kumayl}
+              label="Thursday evening · Laylat al-Jumu'ah"
+            />
+          )}
+
+        </>)}
+        {activeTab === 'plan' && (<>
+        {/* Khatmah reading plan card (only while a plan is active) */}
+        {khatmahState && (() => {
+          const progress = getKhatmahProgress(khatmahState);
+          if (!progress) return null;
+          return (
+            <KhatmahCard
+              progress={progress}
+              surahNames={khatmahSurahNames}
+              onMarkDone={handleKhatmahMarkDone}
+            />
+          );
+        })()}
+          {!khatmahState && (
+            <View style={[styles.planEmpty, { borderColor: theme.border }]}>
+              <Text style={[styles.memorizeHint, { color: theme.textSecondary }]}>
+                No reading plan yet. Start a Khatmah to read the whole Quran portion by
+                portion — your place is kept if a day is missed.
+              </Text>
+              <TouchableOpacity
+                style={[styles.actionBtn, { borderColor: theme.border }]}
+                onPress={() => router.push('/khatmah')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.actionBtnText, { color: theme.bronze }]}>START A PLAN →</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </>)}
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Floating action rail — Quran tab only (v1.0.5, Saira). Carries
+          the actions that used to sit in the button grid under the verse. */}
+      {activeTab === 'quran' && ayah && (
+        <View style={styles.rail}>
+          <TouchableOpacity
+            style={[styles.railBtn, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
+            onPress={toggleAudio}
+            activeOpacity={0.7}
+            accessibilityLabel={player.playing ? 'Pause recitation' : 'Listen to this verse'}
+          >
+            <Text style={styles.railBtnText}>{audioLoading ? '…' : player.playing ? '⏸' : '▶'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.railBtn, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
+            onPress={handleShare}
+            activeOpacity={0.7}
+            accessibilityLabel="Share this verse"
+          >
+            <Text style={styles.railBtnText}>↑</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.railBtn, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
+            onPress={handleShareCard}
+            activeOpacity={0.7}
+            accessibilityLabel="Share this verse as an image card"
+          >
+            <Text style={styles.railBtnText}>{sharingCard ? '…' : '🖼'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.railBtn, { backgroundColor: bookmarked ? theme.bronze : theme.bgCard, borderColor: theme.border }]}
+            onPress={toggleBookmark}
+            activeOpacity={0.7}
+            accessibilityLabel={bookmarked ? 'Remove bookmark from this verse' : 'Save this verse'}
+          >
+            <Text style={styles.railBtnText}>🔖</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.railBtn, { backgroundColor: memorizeMode ? 'rgba(201,162,39,0.18)' : theme.bgCard, borderColor: memorizeMode ? theme.goldText : theme.border }]}
+            onPress={toggleMemorizeMode}
+            activeOpacity={0.7}
+            accessibilityLabel="Memorize this verse"
+          >
+            <Text style={styles.railBtnText}>🧠</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.railBtn, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
+            onPress={() => setReciterModalOpen(true)}
+            activeOpacity={0.7}
+            accessibilityLabel="Choose reciter"
+          >
+            <Text style={styles.railBtnText}>🎙</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Reciter picker + this ayah's audio download — moved off the
+          scroll into a modal behind the rail's reciter button. */}
+      <Modal
+        visible={reciterModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReciterModalOpen(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setReciterModalOpen(false)}>
+          <Pressable
+            style={[styles.modalCard, { backgroundColor: theme.bg, borderColor: theme.border }]}
+            onPress={() => {}}
+          >
+            <Text style={[styles.modalTitle, { color: theme.bronze }]}>RECITER</Text>
+            <ReciterPicker
+              selected={reciter}
+              onSelect={(next) => {
+                void handleReciterChange(next);
+                setReciterModalOpen(false);
+              }}
+              variant="rows"
+            />
+            <TouchableOpacity
+              style={[styles.modalDownload, { borderColor: theme.border }]}
+              onPress={handleDownloadAudio}
+              disabled={downloadingAudio || audioDownloaded}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.actionBtnText, { color: audioDownloaded ? theme.goldText : theme.bronze }]}>
+                {downloadingAudio
+                  ? 'DOWNLOADING…'
+                  : audioDownloaded
+                    ? '✓ DOWNLOADED — PLAYS OFFLINE'
+                    : '⬇ DOWNLOAD AUDIO FOR THIS AYAH'}
+              </Text>
+            </TouchableOpacity>
+            {downloadFailed && (
+              <Text style={[styles.downloadNote, { color: theme.textSecondary }]}>
+                Download failed — check your connection and try again.
+              </Text>
+            )}
+            <TouchableOpacity
+              style={styles.modalClose}
+              onPress={() => setReciterModalOpen(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.actionBtnText, { color: theme.bronze }]}>CLOSE</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Off-screen share card — laid out (so view-shot can capture it)
           but positioned far off-screen; never visible to the user. */}
@@ -1087,7 +1161,7 @@ const styles = StyleSheet.create({
   },
   offlineBannerText: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
+    fontSize: 11,
     color: '#8b6520',
     letterSpacing: 0.5,
     textAlign: 'center',
@@ -1102,7 +1176,7 @@ const styles = StyleSheet.create({
   },
   headerLogo: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 3,
   },
   headerDate: {
@@ -1120,10 +1194,12 @@ const styles = StyleSheet.create({
   },
   arabic: {
     fontFamily: 'Amiri_700Bold',
-    fontSize: 36,
+    fontSize: 33,
     textAlign: 'center',
     writingDirection: 'rtl',
-    lineHeight: 56,
+    // Amiri's tall marks need ~2x the font size in line height — at 56/36
+    // iOS clipped the first line's diacritics (Saira, 1.0.4 device test).
+    lineHeight: 70,
     marginBottom: 4,
   },
   transliterationLabel: {
@@ -1157,7 +1233,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontStyle: 'italic',
     textAlign: 'center',
-    lineHeight: 34,
+    // Urdu (Arabic script) runs tall in Amiri too — same headroom rule.
+    lineHeight: 42,
     marginBottom: 12,
     paddingHorizontal: 8,
   },
@@ -1213,7 +1290,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   actionBtnText: {
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 2,
     fontFamily: 'Amiri_400Regular',
   },
@@ -1236,7 +1313,7 @@ const styles = StyleSheet.create({
   },
   memorizeTitle: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 2,
     textAlign: 'center',
   },
@@ -1268,8 +1345,8 @@ const styles = StyleSheet.create({
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   pillActive: { paddingVertical: 5, paddingHorizontal: 14, borderRadius: 2 },
   pillInactive: { borderWidth: 0.5, paddingVertical: 5, paddingHorizontal: 14, borderRadius: 2 },
-  pillTextActive: { color: '#fff', fontSize: 9, letterSpacing: 1 },
-  pillTextInactive: { fontSize: 9, letterSpacing: 1 },
+  pillTextActive: { color: '#fff', fontSize: 11, letterSpacing: 1 },
+  pillTextInactive: { fontSize: 11, letterSpacing: 1 },
   prayerStrip: { marginTop: 10, marginBottom: 4, width: '100%' },
   prayerItem: {
     alignItems: 'center',
@@ -1281,7 +1358,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   prayerName: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#8b6520',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
@@ -1299,12 +1376,12 @@ const styles = StyleSheet.create({
   },
   tafsirBtnText: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 2,
   },
   tafsirBtnSublabel: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 8,
+    fontSize: 11,
     color: 'rgba(139,101,32,0.55)',
     marginTop: 2,
     letterSpacing: 0.5,
@@ -1354,5 +1431,79 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 0.5,
     marginBottom: 4,
+  },
+  // Today tabs + floating rail + reciter modal (v1.0.5)
+  tabBar: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 2,
+    borderWidth: 0.5,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  tabBtn: { flex: 1, paddingVertical: 9, alignItems: 'center' },
+  tabText: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 12,
+    letterSpacing: 1.5,
+  },
+  rail: {
+    position: 'absolute',
+    right: 10,
+    top: '36%',
+    gap: 10,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  railBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 10,
+    borderWidth: 0.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#1a1205',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  railBtnText: { fontSize: 19 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(13,10,4,0.45)',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  modalCard: {
+    borderWidth: 0.5,
+    borderRadius: 6,
+    paddingVertical: 16,
+    paddingHorizontal: 6,
+  },
+  modalTitle: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 11,
+    letterSpacing: 2,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalDownload: {
+    borderWidth: 0.5,
+    borderRadius: 2,
+    padding: 10,
+    marginTop: 14,
+    marginHorizontal: 14,
+    alignItems: 'center',
+  },
+  modalClose: { padding: 10, marginTop: 8, alignItems: 'center' },
+  planEmpty: {
+    width: '100%',
+    borderWidth: 0.5,
+    borderRadius: 4,
+    padding: 16,
+    alignItems: 'center',
+    gap: 10,
   },
 });
