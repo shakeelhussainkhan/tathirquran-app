@@ -296,8 +296,8 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
       borderBottomWidth: 0.5,
       borderBottomColor: theme.border,
     },
-    back: { fontFamily: 'Amiri_400Regular', fontSize: 14, width: 60, color: theme.gold },
-    title: { fontFamily: 'Amiri_400Regular', fontSize: 10, letterSpacing: 3, color: theme.gold },
+    back: { fontFamily: 'Amiri_400Regular', fontSize: 14, width: 60, color: theme.goldText },
+    title: { fontFamily: 'Amiri_400Regular', fontSize: 11, letterSpacing: 3, color: theme.goldText },
     scroll: { padding: 24 },
     intro: {
       fontFamily: 'Amiri_400Regular',
@@ -355,13 +355,13 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     },
     startBtnText: {
       color: '#fff',
-      fontSize: 10,
+      fontSize: 11,
       letterSpacing: 1.5,
       fontFamily: 'Amiri_400Regular',
     },
     label: {
       fontFamily: 'Amiri_400Regular',
-      fontSize: 10,
+      fontSize: 11,
       letterSpacing: 2,
       color: theme.bronze,
       textAlign: 'center',
@@ -431,7 +431,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     listToggle: { alignSelf: 'center', paddingVertical: 8, marginBottom: 8 },
     listToggleText: {
       fontFamily: 'Amiri_400Regular',
-      fontSize: 10,
+      fontSize: 11,
       letterSpacing: 2,
       color: theme.bronze,
     },
@@ -464,7 +464,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
       marginTop: 8,
     },
     endBtnText: {
-      fontSize: 10,
+      fontSize: 11,
       letterSpacing: 1.5,
       fontFamily: 'Amiri_400Regular',
       color: theme.textSecondary,

@@ -88,7 +88,7 @@ export default function MushafScreen() {
           style={[s.tabBtn, tab === 'surah' && [s.tabBtnActive, { borderBottomColor: theme.gold }]]}
           onPress={() => setTab('surah')}
         >
-          <Text style={[s.tabBtnText, { color: tab === 'surah' ? theme.gold : theme.textSecondary }]}>
+          <Text style={[s.tabBtnText, { color: tab === 'surah' ? theme.goldText : theme.textSecondary }]}>
             BY SURAH
           </Text>
         </TouchableOpacity>
@@ -96,7 +96,7 @@ export default function MushafScreen() {
           style={[s.tabBtn, tab === 'juz' && [s.tabBtnActive, { borderBottomColor: theme.gold }]]}
           onPress={() => setTab('juz')}
         >
-          <Text style={[s.tabBtnText, { color: tab === 'juz' ? theme.gold : theme.textSecondary }]}>
+          <Text style={[s.tabBtnText, { color: tab === 'juz' ? theme.goldText : theme.textSecondary }]}>
             BY JUZ
           </Text>
         </TouchableOpacity>
@@ -115,7 +115,7 @@ export default function MushafScreen() {
               onPress={() => router.push(`/read?mode=surah&surah=${surah.number}` as any)}
               activeOpacity={0.7}
             >
-              <Text style={[s.rowNumber, { color: theme.gold }]}>{surah.number}</Text>
+              <Text style={[s.rowNumber, { color: theme.goldText }]}>{surah.number}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={[s.rowName, { color: theme.text }]}>{surah.nameEnglish}</Text>
                 <Text style={[s.rowMeta, { color: theme.textSecondary }]}>
@@ -146,7 +146,7 @@ export default function MushafScreen() {
               onPress={() => router.push(`/read?mode=juz&juz=${range.juz}` as any)}
               activeOpacity={0.7}
             >
-              <Text style={[s.rowNumber, { color: theme.gold }]}>{range.juz}</Text>
+              <Text style={[s.rowNumber, { color: theme.goldText }]}>{range.juz}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={[s.rowName, { color: theme.text }]}>
                   Juz {range.juz}
@@ -179,9 +179,9 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     },
     headerTitle: {
       fontFamily: 'Amiri_400Regular',
-      fontSize: 10,
+      fontSize: 11,
       letterSpacing: 3,
-      color: theme.gold,
+      color: theme.goldText,
       textAlign: 'center',
     },
     tabRow: {
@@ -198,7 +198,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     tabBtnActive: { borderBottomWidth: 2 },
     tabBtnText: {
       fontFamily: 'Amiri_400Regular',
-      fontSize: 10,
+      fontSize: 11,
       letterSpacing: 2,
     },
     center: {

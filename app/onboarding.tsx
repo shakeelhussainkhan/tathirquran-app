@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   },
   stepIndicator: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 2,
     color: '#8b6520',
     marginBottom: 8,
