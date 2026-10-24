@@ -8,7 +8,6 @@ import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import Onboarding from './onboarding';
-import LaunchIntro from '../components/LaunchIntro';
 import { ensureOfflineData } from '../lib/offlineDb';
 import { refreshPrayerAlerts } from '../lib/prayerAlerts';
 
@@ -20,7 +19,6 @@ export default function RootLayout() {
 
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
   // Launch intro: plays once per cold launch, above onboarding or tabs.
-  const [introDone, setIntroDone] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem('onboarding_complete').then(val => {
@@ -57,7 +55,6 @@ export default function RootLayout() {
     return (
       <SafeAreaProvider>
         <Onboarding onComplete={() => setShowOnboarding(false)} />
-        {!introDone && <LaunchIntro onDone={() => setIntroDone(true)} />}
       </SafeAreaProvider>
     );
   }
@@ -160,7 +157,6 @@ export default function RootLayout() {
         <Tabs.Screen name="ayah/[surah]/[ayah]" options={{ href: null }} />
         <Tabs.Screen name="devotional/[slug]" options={{ href: null }} />
       </Tabs>
-      {!introDone && <LaunchIntro onDone={() => setIntroDone(true)} />}
     </SafeAreaProvider>
   );
 }
