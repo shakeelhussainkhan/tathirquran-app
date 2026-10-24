@@ -127,9 +127,9 @@ export default function AyahDetailScreen() {
       <View style={[styles.goldBar, { backgroundColor: theme.bronze }]} />
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={[styles.back, { color: theme.gold }]}>← Back</Text>
+          <Text style={[styles.back, { color: theme.goldText }]}>← Back</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.gold }]}>AYAH</Text>
+        <Text style={[styles.title, { color: theme.goldText }]}>AYAH</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -162,7 +162,7 @@ export default function AyahDetailScreen() {
               onPress={toggleWbw}
               style={[styles.wbwToggle, { borderColor: theme.gold }]}
             >
-              <Text style={[styles.wbwToggleText, { color: theme.gold }]}>
+              <Text style={[styles.wbwToggleText, { color: theme.goldText }]}>
                 WORD BY WORD {showWbw ? '▾ ON' : '▸ OFF'}
               </Text>
             </TouchableOpacity>
@@ -189,7 +189,7 @@ export default function AyahDetailScreen() {
             <View style={[styles.ornamentLine, { backgroundColor: theme.border }]} />
           </View>
 
-          <Text style={[styles.ref, { color: theme.gold }]}>{ref}</Text>
+          <Text style={[styles.ref, { color: theme.goldText }]}>{ref}</Text>
 
           {detail.translations.map((t: any) => (
             <View key={t.id} style={styles.translationBlock}>
@@ -258,7 +258,7 @@ export default function AyahDetailScreen() {
               <TouchableOpacity
                 onPress={() => router.replace(`/ayah/${surahNumber}/${ayahNumber - 1}` as any)}
               >
-                <Text style={[styles.navText, { color: theme.gold }]}>← Previous</Text>
+                <Text style={[styles.navText, { color: theme.goldText }]}>← Previous</Text>
               </TouchableOpacity>
             ) : (
               <View />
@@ -267,7 +267,7 @@ export default function AyahDetailScreen() {
               <TouchableOpacity
                 onPress={() => router.replace(`/ayah/${surahNumber}/${ayahNumber + 1}` as any)}
               >
-                <Text style={[styles.navText, { color: theme.gold }]}>Next →</Text>
+                <Text style={[styles.navText, { color: theme.goldText }]}>Next →</Text>
               </TouchableOpacity>
             ) : (
               <View />
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
   },
   back: { fontFamily: 'Amiri_400Regular', fontSize: 14, width: 60 },
-  title: { fontFamily: 'Amiri_400Regular', fontSize: 10, letterSpacing: 3 },
+  title: { fontFamily: 'Amiri_400Regular', fontSize: 11, letterSpacing: 3 },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -315,14 +315,14 @@ const styles = StyleSheet.create({
   },
   surahLabel: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   arabic: {
     fontFamily: 'Amiri_700Bold',
     fontSize: 30,
-    lineHeight: 54,
+    lineHeight: 60,
     textAlign: 'right',
     writingDirection: 'rtl',
     marginBottom: 20,
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
   },
   wbwToggleText: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
@@ -378,12 +378,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Amiri_400Regular',
     fontSize: 16,
     fontStyle: 'italic',
-    lineHeight: 26,
+    lineHeight: 30,
   },
   translationRtl: { textAlign: 'right', writingDirection: 'rtl', fontStyle: 'normal' },
   scholar: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 9,
+    fontSize: 11,
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginTop: 4,
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
   },
   tafsirLabel: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 9,
+    fontSize: 11,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     marginBottom: 8,

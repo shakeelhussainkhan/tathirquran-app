@@ -76,7 +76,7 @@ export default function RootLayout() {
           tabBarInactiveTintColor: Colors.inkSoft,
           tabBarLabelStyle: {
             fontFamily: 'Amiri_400Regular',
-            fontSize: 10,
+            fontSize: 11,
             letterSpacing: 1,
           },
         }}

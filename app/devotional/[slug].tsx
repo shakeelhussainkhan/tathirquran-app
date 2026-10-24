@@ -64,7 +64,7 @@ export default function DevotionalScreen() {
           <>
             <Text style={[styles.title, { color: theme.text }]}>{devotional.title}</Text>
             {devotional.occasion_tag ? (
-              <Text style={[styles.occasion, { color: theme.gold }]}>{devotional.occasion_tag}</Text>
+              <Text style={[styles.occasion, { color: theme.goldText }]}>{devotional.occasion_tag}</Text>
             ) : null}
 
             {/* Arabic text — verbatim from the cited Shia source */}
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   translation: {
     fontFamily: 'Amiri_400Regular',
     fontSize: 17,
-    lineHeight: 28,
+    lineHeight: 32,
     width: '100%',
     marginBottom: 28,
   },
