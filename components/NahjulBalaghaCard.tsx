@@ -24,7 +24,7 @@ export default function NahjulBalaghaCard({ quote }: { quote: NahjulBalaghaQuote
         { borderColor: theme.border, backgroundColor: theme.gold + '0D' },
       ]}
     >
-      <Text style={[styles.label, { color: theme.gold }]}>From Nahjul Balagha</Text>
+      <Text style={[styles.label, { color: theme.goldText }]}>From Nahjul Balagha</Text>
       <Text style={[styles.quote, { color: theme.text }]}>“{quote.text}”</Text>
       <Text style={[styles.attribution, { color: theme.bronze }]}>
         {quoteAttribution(quote)}
@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 2,
     textTransform: 'uppercase',
     marginBottom: 8,

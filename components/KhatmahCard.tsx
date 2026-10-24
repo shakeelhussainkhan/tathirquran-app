@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 2,
     textAlign: 'center',
     marginBottom: 4,
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 1.5,
     textAlign: 'center',
     marginBottom: 4,
@@ -168,13 +168,13 @@ const styles = StyleSheet.create({
   doneBtn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 2 },
   doneBtnText: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 1.5,
     fontFamily: 'Amiri_400Regular',
   },
   openBtn: { borderWidth: 0.5, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 2 },
   openBtnText: {
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 1.5,
     fontFamily: 'Amiri_400Regular',
   },
