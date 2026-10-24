@@ -257,7 +257,7 @@ export default function VerseReader({
     return (
       <View style={[s.ayahBlock, { borderBottomColor: theme.border }]}>
         <View style={s.ayahTopRow}>
-          <Text style={[s.refChip, { color: theme.gold }]}>
+          <Text style={[s.refChip, { color: theme.goldText }]}>
             {ayah.surah_number}:{ayah.ayah_number}
           </Text>
           <TouchableOpacity
@@ -265,7 +265,7 @@ export default function VerseReader({
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel={isPlayingThis ? 'Pause recitation' : 'Play recitation'}
           >
-            <Text style={[s.playBtn, { color: theme.gold }]}>
+            <Text style={[s.playBtn, { color: theme.goldText }]}>
               {isPlayingThis ? '⏸' : '▶'}
             </Text>
           </TouchableOpacity>
@@ -332,7 +332,7 @@ export default function VerseReader({
                 <Text style={s.footerBtnText}>{footerAction.label}</Text>
               </TouchableOpacity>
             ) : (
-              <Text style={[s.footerNote, { color: theme.gold }]}>{footerNote}</Text>
+              <Text style={[s.footerNote, { color: theme.goldText }]}>{footerNote}</Text>
             )}
           </View>
         ) : null
@@ -373,7 +373,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     },
     credit: {
       fontFamily: 'Amiri_400Regular',
-      fontSize: 10,
+      fontSize: 11,
       letterSpacing: 1.5,
       textTransform: 'uppercase',
       marginBottom: 4,
@@ -403,7 +403,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     },
     surahHeaderMeta: {
       fontFamily: 'Amiri_400Regular',
-      fontSize: 9,
+      fontSize: 11,
       letterSpacing: 2,
       marginTop: 4,
     },
@@ -441,7 +441,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     translation: {
       fontFamily: 'Amiri_400Regular',
       fontSize: 15,
-      lineHeight: 24,
+      lineHeight: 28,
     },
     translationRtl: { textAlign: 'right', writingDirection: 'rtl' },
     footer: { alignItems: 'center', paddingTop: 24 },

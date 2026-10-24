@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
   wordText: {
     fontFamily: 'Amiri_700Bold',
     fontSize: 30,
-    lineHeight: 54,
+    lineHeight: 60,
   },
   panel: {
     borderWidth: 0.5,
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
   panelArabic: {
     fontFamily: 'Amiri_700Bold',
     fontSize: 26,
-    lineHeight: 44,
+    lineHeight: 52,
     writingDirection: 'rtl',
   },
   panelTranslit: {
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   strip: { marginBottom: 8 },
   stripLabel: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 9,
+    fontSize: 11,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     marginBottom: 10,
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   stripArabic: {
     fontFamily: 'Amiri_700Bold',
     fontSize: 19,
-    lineHeight: 30,
+    lineHeight: 38,
     flex: 1,
     textAlign: 'right',
     writingDirection: 'rtl',
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   },
   note: {
     fontFamily: 'Amiri_400Regular',
-    fontSize: 10,
+    fontSize: 11,
     lineHeight: 15,
     marginTop: 10,
   },
