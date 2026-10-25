@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
+import QiblaAR from '../components/QiblaAR';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
@@ -39,6 +40,9 @@ export default function QiblaScreen() {
   const [usingMagnetic, setUsingMagnetic] = useState(false);
   const [headingUnavailable, setHeadingUnavailable] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  // Compass by default; the camera (AR) view is the same data over the
+  // live camera (v1.0.6 — Shakeel asked for the Google-style finder).
+  const [mode, setMode] = useState<'compass' | 'ar'>('compass');
   const headingSub = useRef<Location.LocationSubscription | null>(null);
 
   useEffect(() => {
@@ -155,9 +159,29 @@ export default function QiblaScreen() {
         </View>
       )}
 
-      {status === 'ready' && coords && (
+      {status === 'ready' && coords && mode === 'ar' && (
+        <QiblaAR
+          theme={theme}
+          bearing={bearing}
+          distanceKm={distanceKm}
+          heading={heading}
+          turn={turn}
+          aligned={aligned}
+          onExit={() => setMode('compass')}
+        />
+      )}
+
+      {status === 'ready' && coords && mode === 'compass' && (
         <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={s.scroll}>
           <Text style={s.intro}>The direction of prayer from where you are now.</Text>
+
+          <TouchableOpacity
+            style={[s.modeChip, { borderColor: theme.border, backgroundColor: theme.bgCard }]}
+            onPress={() => setMode('ar')}
+            activeOpacity={0.7}
+          >
+            <Text style={[s.modeChipText, { color: theme.primary }]}>📷  CAMERA VIEW — FIND IT LIVE</Text>
+          </TouchableOpacity>
 
           {/* Compass */}
           <View style={s.compassArea}>
@@ -215,7 +239,10 @@ export default function QiblaScreen() {
                 ]}
               >
                 <View style={[s.qiblaMarker, aligned && s.qiblaMarkerAligned]}>
-                  <Text style={s.qiblaMarkerText}>🕋</Text>
+                  <Image
+                    source={require('../assets/images/kaaba-cube.jpg')}
+                    style={s.qiblaPhoto}
+                  />
                 </View>
               </View>
             </View>
@@ -287,6 +314,10 @@ export default function QiblaScreen() {
               phone slowly in a figure-eight motion to calibrate it.
             </Text>
           )}
+
+          <Text style={s.creditNote}>
+            Kaaba photograph: Richard Mortel · CC BY 2.0 · via Wikimedia Commons
+          </Text>
 
           <Text style={s.footerNote}>
             Calculated from your location to the Kaaba in Makkah
@@ -377,7 +408,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
       fontSize: 16,
       color: theme.bronze,
     },
-    pointerAligned: { color: '#2e7d32' },
+    pointerAligned: { color: theme.primary },
     dial: {
       width: DIAL_SIZE,
       height: DIAL_SIZE,
@@ -426,8 +457,8 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    qiblaMarkerAligned: { backgroundColor: '#2e7d32', borderColor: '#2e7d32' },
-    qiblaMarkerText: { fontSize: 20 },
+    qiblaMarkerAligned: { borderColor: theme.primary, borderWidth: 2.5 },
+    qiblaPhoto: { width: 38, height: 38, borderRadius: 19 },
     centerHub: {
       position: 'absolute',
       alignItems: 'center',
@@ -447,7 +478,7 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
     alignedText: {
       fontFamily: 'Amiri_700Bold',
       fontSize: 16,
-      color: '#2e7d32',
+      color: theme.primary,
       textAlign: 'center',
       marginTop: 4,
       marginBottom: 8,
@@ -479,6 +510,22 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
       fontFamily: 'Amiri_400Regular',
       fontSize: 13,
       color: theme.textSecondary,
+    },
+    modeChip: {
+      borderWidth: 0.5,
+      borderRadius: 999,
+      paddingVertical: 9,
+      paddingHorizontal: 16,
+      marginBottom: 10,
+    },
+    modeChipText: { fontSize: 11, letterSpacing: 1.5, fontWeight: '700' },
+    creditNote: {
+      fontFamily: 'Amiri_400Regular',
+      fontSize: 10.5,
+      color: theme.textSecondary,
+      textAlign: 'center',
+      marginTop: 16,
+      opacity: 0.85,
     },
     note: {
       fontFamily: 'Amiri_400Regular',
