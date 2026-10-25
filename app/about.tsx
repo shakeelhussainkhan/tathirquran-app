@@ -88,6 +88,12 @@ export default function AboutScreen() {
           <Text style={styles.email}>Jafri Library — jafrilibrary.org</Text>
         </TouchableOpacity>
 
+        <Text style={styles.creditText}>
+          The Kaaba photograph in the Qibla Finder is by Richard Mortel,
+          used under a Creative Commons Attribution 2.0 licence, via
+          Wikimedia Commons.
+        </Text>
+
         <View style={styles.divider} />
 
         {/* Built by */}
