@@ -632,6 +632,19 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           );
         })()}
+        {/* QIBLA */}
+        <Text style={s.sectionHeader}>QIBLA</Text>
+
+        <TouchableOpacity style={s.row} onPress={() => router.push('/qibla')}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text style={s.rowLabel}>Qibla Finder</Text>
+            <Text style={{ fontFamily: 'Amiri_400Regular', fontSize: 12, color: theme.textSecondary, marginTop: 3 }}>
+              The direction of prayer from where you are — compass or live camera view. Also linked from Today's prayer times.
+            </Text>
+          </View>
+          <Text style={s.rowLink}>Open →</Text>
+        </TouchableOpacity>
+
         {/* ISLAMIC CALENDAR */}
         <Text style={s.sectionHeader}>ISLAMIC CALENDAR</Text>
 
@@ -660,6 +673,11 @@ export default function SettingsScreen() {
 
         {/* ABOUT */}
         <Text style={s.sectionHeader}>ABOUT</Text>
+
+        <TouchableOpacity style={s.row} onPress={() => router.push('/about')}>
+          <Text style={s.rowLabel}>About TathirQuran</Text>
+          <Text style={s.rowLink}>Open →</Text>
+        </TouchableOpacity>
 
         <View style={s.row}>
           <Text style={s.rowLabel}>Version</Text>

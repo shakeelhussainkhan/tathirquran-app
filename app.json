@@ -39,7 +39,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#faf5e9",
+          "backgroundColor": "#FAF6ED",
           "image": "./assets/splash.png",
           "resizeMode": "contain"
         }
@@ -48,8 +48,10 @@
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#c9a227",
-          "sounds": ["./assets/sounds/azan_notification.wav"],
+          "color": "#C3A56A",
+          "sounds": [
+            "./assets/sounds/azan_notification.wav"
+          ],
           "mode": "production"
         }
       ],
@@ -61,7 +63,16 @@
         }
       ],
       "expo-sharing",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "TathirQuran uses the camera only on the Qibla Finder screen, to show the direction of prayer over your surroundings. Nothing is photographed or recorded.",
+          "microphonePermission": "TathirQuran does not use the microphone.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
+        }
+      ]
     ],
     "scheme": "tathirquran",
     "experiments": {

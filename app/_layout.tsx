@@ -3,7 +3,8 @@ import { useFonts } from 'expo-font';
 import { Amiri_400Regular, Amiri_700Bold } from '@expo-google-fonts/amiri';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Colors } from '../constants/colors';
-import { AppState, Text } from 'react-native';
+import { AppState } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
@@ -72,9 +73,9 @@ export default function RootLayout() {
           tabBarActiveTintColor: Colors.bronze,
           tabBarInactiveTintColor: Colors.inkSoft,
           tabBarLabelStyle: {
-            fontFamily: 'Amiri_400Regular',
-            fontSize: 11,
-            letterSpacing: 1,
+            fontSize: 10.5,
+            fontWeight: '600',
+            letterSpacing: 0.4,
           },
         }}
       >
@@ -82,8 +83,8 @@ export default function RootLayout() {
           name="index"
           options={{
             title: 'Today',
-            tabBarIcon: ({ color }) => (
-              <Text style={{ fontSize: 18, color }}>☀</Text>
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={21} color={color} />
             ),
           }}
         />
@@ -91,8 +92,8 @@ export default function RootLayout() {
           name="archive"
           options={{
             title: 'Archive',
-            tabBarIcon: ({ color }) => (
-              <Text style={{ fontSize: 18, color }}>📜</Text>
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'archive' : 'archive-outline'} size={21} color={color} />
             ),
           }}
         />
@@ -100,8 +101,8 @@ export default function RootLayout() {
           name="mushaf"
           options={{
             title: 'Mushaf',
-            tabBarIcon: ({ color }) => (
-              <Text style={{ fontSize: 18, color }}>📖</Text>
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'book' : 'book-outline'} size={21} color={color} />
             ),
           }}
         />
@@ -109,35 +110,8 @@ export default function RootLayout() {
           name="search"
           options={{
             title: 'Search',
-            tabBarIcon: ({ color }) => (
-              <Text style={{ fontSize: 18, color }}>🔍</Text>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="circles"
-          options={{
-            title: 'Circle',
-            tabBarIcon: ({ color }) => (
-              <Text style={{ fontSize: 18, color }}>👥</Text>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="qibla"
-          options={{
-            title: 'Qibla',
-            tabBarIcon: ({ color }) => (
-              <Text style={{ fontSize: 18, color }}>🧭</Text>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="about"
-          options={{
-            title: 'About',
-            tabBarIcon: ({ color }) => (
-              <Text style={{ fontSize: 18, color }}>ℹ</Text>
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'search' : 'search-outline'} size={21} color={color} />
             ),
           }}
         />
@@ -145,11 +119,18 @@ export default function RootLayout() {
           name="settings"
           options={{
             title: 'Settings',
-            tabBarIcon: ({ color }) => (
-              <Text style={{ fontSize: 18, color }}>⚙</Text>
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? 'settings' : 'settings-outline'} size={21} color={color} />
             ),
           }}
         />
+        {/* v1.0.6: the bar is five tabs. Qibla, Circle and About are
+            reached from Settings (and Qibla also from Today's prayer
+            module and the prayer clock); Calendar from the Hijri date
+            on Today and from Settings. */}
+        <Tabs.Screen name="circles" options={{ href: null }} />
+        <Tabs.Screen name="qibla" options={{ href: null }} />
+        <Tabs.Screen name="about" options={{ href: null }} />
         <Tabs.Screen name="onboarding" options={{ href: null }} />
         <Tabs.Screen name="khatmah" options={{ href: null }} />
         <Tabs.Screen name="read" options={{ href: null }} />

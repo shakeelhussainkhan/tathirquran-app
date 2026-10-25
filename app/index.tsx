@@ -23,7 +23,7 @@ import {
   type Reciter,
 } from '../lib/reciters';
 import NoteTagsEditor from '../components/NoteTagsEditor';
-import { getTodayAyah, getDefaultTranslation, getLiveLanguages, getAllTafsirForAyah, getSurahNames } from '../lib/queries';
+import { getTodayAyah, getDefaultTranslation, getLiveLanguages, getAllTafsirForAyah, getSurahNames, getAyahDetail, getSurahList } from '../lib/queries';
 import {
   splitAyahWords, nextWordToHide, nextWordToReveal,
   isMemorized as fetchIsMemorized, setMemorized as storeSetMemorized,
@@ -50,7 +50,12 @@ import {
   type StreakMilestone,
   type StreakState,
 } from '../lib/streaks';
-import { maybeCheckInToCircle } from '../lib/circles';
+import { maybeCheckInToCircle, loadMembership, fetchCircleToday, type CircleToday } from '../lib/circles';
+import PrayerModule from '../components/PrayerModule';
+import PrayerTimesModal from '../components/PrayerClock';
+import { getIslamicOccasions, getTodayHijriParts, hijriMonthName } from '../lib/calendar';
+import { qiblaBearing } from '../lib/qibla';
+import { Ionicons } from '@expo/vector-icons';
 
 const REFLECTION_NOTE = 'Written by the TathirQuran team to aid reflection. Not a quotation from any tafsir. Under review by scholars.';
 
@@ -110,6 +115,16 @@ export default function HomeScreen() {
   // reading plan get one tab each instead of a single long scroll.
   const [activeTab, setActiveTab] = useState<'quran' | 'quote' | 'plan'>('quran');
   const [reciterModalOpen, setReciterModalOpen] = useState(false);
+  // v1.0.6 design round: prayer clock pop-out, qibla bearing for the
+  // prayer module, today's occasion (calendar), circle summary for the
+  // Reading Plan tab, and Prev/Next ayah browsing from Today.
+  const [prayerClockOpen, setPrayerClockOpen] = useState(false);
+  const [bearing, setBearing] = useState<number | null>(null);
+  const [todayAyahId, setTodayAyahId] = useState<number | null>(null);
+  const [todayOccasion, setTodayOccasion] = useState<string | null>(null);
+  const [surahList, setSurahList] = useState<any[]>([]);
+  const [inCircle, setInCircle] = useState(false);
+  const [circleToday, setCircleToday] = useState<CircleToday | null>(null);
   const player = useAudioPlayer(null);
   const playerStatus = useAudioPlayerStatus(player);
   const currentAyahId = useRef<number | null>(null);
@@ -173,6 +188,7 @@ export default function HomeScreen() {
           getLiveLanguages(),
         ]);
         if (todayAyah) {
+          setTodayAyahId(todayAyah.ayah_id);
           const [trans, tafsir] = await Promise.all([
             getDefaultTranslation(todayAyah.ayah_id, lang),
             getAllTafsirForAyah(todayAyah.ayah_id, 'en'),
@@ -218,6 +234,21 @@ export default function HomeScreen() {
     useCallback(() => {
       let cancelled = false;
       (async () => {
+        // Family circle summary for the Reading Plan tab (best-effort;
+        // no membership simply means the invite card shows instead).
+        try {
+          const membership = await loadMembership();
+          if (!cancelled && membership) {
+            setInCircle(true);
+            const todayInfo = await fetchCircleToday(membership.circle_id).catch(() => null);
+            if (!cancelled && todayInfo) setCircleToday(todayInfo);
+          } else if (!cancelled) {
+            setInCircle(false);
+            setCircleToday(null);
+          }
+        } catch {
+          // Circles are optional — silence by design.
+        }
         const saved = await loadKhatmahState();
         if (cancelled) return;
         setKhatmahState(saved);
@@ -234,6 +265,34 @@ export default function HomeScreen() {
     if (!khatmahState) return;
     setKhatmahState(await markPortionDone(khatmahState, portionIndex));
   };
+
+  // Surah list — Prev/Next needs each surah's ayah count at the edges.
+  useEffect(() => {
+    let cancelled = false;
+    getSurahList().then((rows) => {
+      if (!cancelled && Array.isArray(rows)) setSurahList(rows);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  // Today's Islamic occasion (Wiladat / Shahadat), from the same
+  // islamic_calendar_tags rows the calendar screen reads — shown as one
+  // quiet line under the header on occasion days only, and the Hijri
+  // date itself is the shortcut into the calendar.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const parts = getTodayHijriParts();
+      if (!parts) return;
+      const occasions = await getIslamicOccasions();
+      if (cancelled) return;
+      const match = occasions.find(
+        (o) => o.hijriMonth === parts.month && o.hijriDay === parts.day,
+      );
+      if (match) setTodayOccasion(match.occasion);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Check bookmark state when ayah loads
   useEffect(() => {
@@ -337,11 +396,89 @@ export default function HomeScreen() {
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
         const times = calculatePrayerTimes(loc.coords.latitude, loc.coords.longitude, new Date());
         setPrayerTimes(times);
+        setBearing(qiblaBearing(loc.coords.latitude, loc.coords.longitude));
       } catch {
         // Prayer times are optional — silently skip
       }
     })();
   }, []);
+
+  // ── Prev/Next ayah browsing (v1.0.6, Saira) ──────────────────────
+  // Steps from the verse on screen, across surah edges, using the same
+  // detail read as the ayah page. "Today's verse" returns to the
+  // scheduled verse. Audio never carries across a step.
+  const browsing = todayAyahId !== null && !!ayah && ayah.ayah_id !== todayAyahId;
+
+  const loadAyahAt = async (surah: number, ayahNumber: number) => {
+    try {
+      const detail = await getAyahDetail(surah, ayahNumber);
+      if (!detail?.ayah) return;
+      Speech.stop();
+      setIsSpeaking(false);
+      if (player.playing) player.pause();
+      loadedAudioUri.current = null;
+      currentAyahId.current = detail.ayah.ayah_id;
+      setAyah(detail.ayah);
+      const picked =
+        detail.translations.find((t: any) => t.languageCode === selectedLang) ??
+        detail.translations.find((t: any) => t.isDefault) ??
+        detail.translations[0];
+      setTranslation(
+        picked
+          ? { text: picked.text, translations: { scholar_name: picked.scholarName } }
+          : null,
+      );
+      setTafsirEntries(detail.tafsirEntries ?? []);
+    } catch {
+      // Stay on the current verse if the step cannot load.
+    }
+  };
+
+  const surahAyahCount = (surah: number): number | null => {
+    const row = surahList.find((r: any) => r.surah_number === surah);
+    return row?.ayah_count ?? null;
+  };
+
+  const handlePrevAyah = () => {
+    if (!ayah) return;
+    if (ayah.ayah_number > 1) {
+      void loadAyahAt(ayah.surah_number, ayah.ayah_number - 1);
+    } else if (ayah.surah_number > 1) {
+      const count = surahAyahCount(ayah.surah_number - 1);
+      if (count) void loadAyahAt(ayah.surah_number - 1, count);
+    }
+  };
+
+  const handleNextAyah = () => {
+    if (!ayah) return;
+    const count = surahAyahCount(ayah.surah_number);
+    if (count !== null && ayah.ayah_number < count) {
+      void loadAyahAt(ayah.surah_number, ayah.ayah_number + 1);
+    } else if (count !== null && ayah.surah_number < 114) {
+      void loadAyahAt(ayah.surah_number + 1, 1);
+    }
+  };
+
+  const returnToToday = async () => {
+    try {
+      const todayAyah = await getTodayAyah();
+      if (!todayAyah) return;
+      const [trans, tafsir] = await Promise.all([
+        getDefaultTranslation(todayAyah.ayah_id, selectedLang),
+        getAllTafsirForAyah(todayAyah.ayah_id, 'en'),
+      ]);
+      Speech.stop();
+      setIsSpeaking(false);
+      if (player.playing) player.pause();
+      loadedAudioUri.current = null;
+      currentAyahId.current = todayAyah.ayah_id;
+      setAyah(todayAyah);
+      setTranslation(trans);
+      setTafsirEntries(tafsir);
+    } catch {
+      // Stay where we are.
+    }
+  };
 
   const handleLangChange = async (langCode: string) => {
     setSelectedLang(langCode);
@@ -590,6 +727,7 @@ export default function HomeScreen() {
 
   const today = new Date();
   const hijri = gregorianToHijri(today);
+  const hijriParts = getTodayHijriParts();
 
   const grouped: Record<string, any[]> = {};
   tafsirEntries.forEach((t) => {
@@ -612,59 +750,27 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Header */}
+      {/* Header — the Hijri date is the shortcut into the Islamic
+          calendar (v1.0.6: the calendar no longer hides in Settings). */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
         <Text style={[styles.headerLogo, { color: theme.bronze }]}>TATHIRQURAN</Text>
-        <Text style={[styles.headerDate, { color: theme.textSecondary }]}>{hijri}</Text>
+        <TouchableOpacity onPress={() => router.push('/calendar')} activeOpacity={0.7} hitSlop={8}>
+          <Text style={[styles.headerDate, { color: theme.textSecondary }]}>{hijri}</Text>
+        </TouchableOpacity>
       </View>
 
-        {/* Streak — small and gentle; milestones celebrate, misses welcome */}
-        {streak && streak.current_streak > 0 && (
-          <View style={[styles.streakBox, { borderColor: theme.border, marginTop: 10, marginBottom: 4 }]}>
-            <Text style={[styles.streakText, { color: theme.bronze }]}>
-              ✦ {streakLabel(streak.current_streak)}
-              {streak.longest_streak > streak.current_streak
-                ? `  ·  Longest ${streak.longest_streak}`
-                : ''}
-            </Text>
-            {streakMilestone ? (
-              <>
-                <Text style={[styles.streakMilestone, { color: theme.goldText }]}>
-                  {streakMilestone.title}
-                </Text>
-                <Text style={[styles.streakMessage, { color: theme.textSecondary }]}>
-                  {streakMilestone.message}
-                </Text>
-              </>
-            ) : streakReturned ? (
-              <Text style={[styles.streakMessage, { color: theme.textSecondary }]}>
-                {WELCOME_BACK_MESSAGE}
-              </Text>
-            ) : null}
-          </View>
-        )}
-
-        {/* Prayer times strip */}
-        {prayerTimes && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.prayerStrip, { width: 'auto', marginHorizontal: 20 }]}>
-            {[
-              { name: 'Fajr', time: prayerTimes.fajr },
-              { name: 'Sunrise', time: prayerTimes.sunrise },
-              { name: 'Dhuhr', time: prayerTimes.dhuhr },
-              { name: 'Asr', time: prayerTimes.asr },
-              { name: 'Maghrib', time: prayerTimes.maghrib },
-              { name: 'Isha', time: prayerTimes.isha },
-            ].map(p => (
-              <View key={p.name} style={styles.prayerItem}>
-                <Text style={styles.prayerName}>{p.name}</Text>
-                <Text style={[styles.prayerTime, { color: theme.goldText }]}>{formatTime(p.time)}</Text>
-              </View>
-            ))}
-          </ScrollView>
-        )}
+      {/* Occasion line — Wiladat / Shahadat days only, from the
+          islamic_calendar_tags rows; one quiet line, tap for the calendar. */}
+      {todayOccasion && hijriParts && (
+        <TouchableOpacity onPress={() => router.push('/calendar')} activeOpacity={0.7}>
+          <Text style={[styles.occasionLine, { color: theme.goldText }]}>
+            {hijriParts.day} {hijriMonthName(hijriParts.month)} · {todayOccasion}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* Today tabs (v1.0.5, Saira): verse / quote / reading plan */}
-      <View style={[styles.tabBar, { borderColor: theme.border, backgroundColor: theme.bgCard }]}>
+      <View style={[styles.tabBar, { backgroundColor: theme.bgSoft }]}>
         {([
           { key: 'quran', label: 'Quran' },
           { key: 'quote', label: 'Quote' },
@@ -678,14 +784,14 @@ export default function HomeScreen() {
             accessibilityRole="tab"
             accessibilityState={{ selected: activeTab === tab.key }}
           >
-            <Text style={[styles.tabText, { color: activeTab === tab.key ? '#fff' : theme.textSecondary }]}>
+            <Text style={[styles.tabText, { color: activeTab === tab.key ? '#FAF6ED' : theme.textSecondary }]}>
               {tab.label}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={[styles.scroll, activeTab === 'quran' && { paddingRight: 64 }]}>
+      <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={styles.scroll}>
         {activeTab === 'quran' && (<>
         {/* Bismillah */}
         {showBismillah && (
@@ -744,13 +850,96 @@ export default function HomeScreen() {
 
         {/* Reference */}
         <Text style={[styles.ref, { color: theme.goldText }]}>
-          {ayah?.surahs?.name_english?.toUpperCase()} · {ayah?.surah_number}:{ayah?.ayah_number}
+          {ayah?.surahs?.name_english?.toUpperCase()} · {ayah?.surahs?.name_arabic ? `${ayah.surahs.name_arabic} · ` : ''}{ayah?.surah_number}:{ayah?.ayah_number}
         </Text>
 
         {/* Scholar */}
         <Text style={[styles.scholar, { color: theme.bronze }]}>
           {translation?.translations?.scholar_name}
         </Text>
+
+        {/* Previous / Next ayah (v1.0.6, Saira) */}
+        <View style={styles.prevNextRow}>
+          <TouchableOpacity onPress={handlePrevAyah} hitSlop={8} activeOpacity={0.7}>
+            <Text style={[styles.prevNextText, { color: theme.primary }]}>‹ Previous</Text>
+          </TouchableOpacity>
+          {browsing ? (
+            <TouchableOpacity onPress={returnToToday} hitSlop={8} activeOpacity={0.7}>
+              <Text style={[styles.todayChip, { color: theme.goldText, borderColor: theme.border }]}>TODAY'S VERSE</Text>
+            </TouchableOpacity>
+          ) : (
+            <View />
+          )}
+          <TouchableOpacity onPress={handleNextAyah} hitSlop={8} activeOpacity={0.7}>
+            <Text style={[styles.prevNextText, { color: theme.primary }]}>Next ›</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Verse actions (v1.0.6: the floating rail is abolished — only
+            Audio, Share and Reciter remain, below the verse). */}
+        <View style={styles.actionRow}>
+          <View style={styles.actionItem}>
+            <TouchableOpacity
+              style={[styles.actionCircle, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
+              onPress={toggleAudio}
+              activeOpacity={0.7}
+              accessibilityLabel={player.playing ? 'Pause recitation' : 'Listen to this verse'}
+            >
+              {audioLoading ? (
+                <ActivityIndicator size="small" color={theme.primary} />
+              ) : (
+                <Ionicons name={player.playing ? 'pause' : 'play'} size={21} color={theme.primary} />
+              )}
+            </TouchableOpacity>
+            <Text style={[styles.actionLabel, { color: theme.textSecondary }]}>Audio</Text>
+          </View>
+          <View style={styles.actionItem}>
+            <TouchableOpacity
+              style={[styles.actionCircle, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
+              onPress={handleShare}
+              activeOpacity={0.7}
+              accessibilityLabel="Share this verse"
+            >
+              <Ionicons name="share-outline" size={20} color={theme.primary} />
+            </TouchableOpacity>
+            <Text style={[styles.actionLabel, { color: theme.textSecondary }]}>Share</Text>
+          </View>
+          <View style={styles.actionItem}>
+            <TouchableOpacity
+              style={[styles.actionCircle, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
+              onPress={() => setReciterModalOpen(true)}
+              activeOpacity={0.7}
+              accessibilityLabel="Choose reciter"
+            >
+              <Ionicons name="mic-outline" size={20} color={theme.primary} />
+            </TouchableOpacity>
+            <Text style={[styles.actionLabel, { color: theme.textSecondary }]}>Reciter</Text>
+          </View>
+        </View>
+
+        {/* Language pills */}
+        <View style={styles.langSection}>
+          <Text style={[styles.langLabel, { color: theme.bronze }]}>LANGUAGE</Text>
+          <View style={styles.pillRow}>
+            {languages.map(lang => (
+              <TouchableOpacity
+                key={lang.language_code}
+                style={selectedLang === lang.language_code
+                  ? [styles.pillActive, { backgroundColor: theme.bronze }]
+                  : [styles.pillInactive, { borderColor: theme.border }]}
+                onPress={() => handleLangChange(lang.language_code)}
+                disabled={lang.launch_status === 'beta'}
+              >
+                <Text style={selectedLang === lang.language_code
+                  ? styles.pillTextActive
+                  : [styles.pillTextInactive, { color: theme.textSecondary }]}>
+                  {lang.language_name}
+                  {lang.launch_status === 'beta' ? ' *' : ''}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
         {/* Devotional cards — only when a matching devotional_texts row exists */}
         {devotionals?.occasionDevotional && (
@@ -855,30 +1044,6 @@ export default function HomeScreen() {
             )}
           </View>
         )}
-
-        {/* Language pills */}
-        <View style={styles.langSection}>
-          <Text style={[styles.langLabel, { color: theme.bronze }]}>LANGUAGE</Text>
-          <View style={styles.pillRow}>
-            {languages.map(lang => (
-              <TouchableOpacity
-                key={lang.language_code}
-                style={selectedLang === lang.language_code
-                  ? [styles.pillActive, { backgroundColor: theme.bronze }]
-                  : [styles.pillInactive, { borderColor: theme.border }]}
-                onPress={() => handleLangChange(lang.language_code)}
-                disabled={lang.launch_status === 'beta'}
-              >
-                <Text style={selectedLang === lang.language_code
-                  ? styles.pillTextActive
-                  : [styles.pillTextInactive, { color: theme.textSecondary }]}>
-                  {lang.language_name}
-                  {lang.launch_status === 'beta' ? ' *' : ''}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
 
         {/* Personal note & tags (stored on this device only) */}
         {ayah && (
@@ -1015,64 +1180,34 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
           )}
-        </>)}
-        <View style={{ height: 40 }} />
-      </ScrollView>
 
-      {/* Floating action rail — Quran tab only (v1.0.5, Saira). Carries
-          the actions that used to sit in the button grid under the verse. */}
-      {activeTab === 'quran' && ayah && (
-        <View style={styles.rail}>
+          {/* Family Circle (v1.0.6: surfaced from Settings onto the
+              Reading Plan tab — reading together, beside your own plan). */}
           <TouchableOpacity
-            style={[styles.railBtn, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
-            onPress={toggleAudio}
+            style={[styles.circleCard, { borderColor: theme.border, backgroundColor: theme.bgCard }]}
+            onPress={() => router.push('/circles')}
             activeOpacity={0.7}
-            accessibilityLabel={player.playing ? 'Pause recitation' : 'Listen to this verse'}
           >
-            <Text style={styles.railBtnText}>{audioLoading ? '…' : player.playing ? '⏸' : '▶'}</Text>
+            <Text style={[styles.circleKicker, { color: theme.goldText }]}>FAMILY CIRCLE · READING TOGETHER</Text>
+            <Text style={[styles.circleText, { color: theme.textSecondary }]}>
+              {inCircle && circleToday
+                ? `${circleToday.members.filter((m) => m.checked_in).length} of ${circleToday.members.length} in ${circleToday.name} have read today's verse.`
+                : inCircle
+                  ? "See how your circle is doing with today's verse."
+                  : 'Read the daily verse together with your family — no accounts, just an invite code.'}
+            </Text>
+            <Text style={[styles.circleLink, { color: theme.bronze }]}>
+              {inCircle ? 'OPEN CIRCLE →' : 'START OR JOIN A CIRCLE →'}
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.railBtn, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
-            onPress={handleShare}
-            activeOpacity={0.7}
-            accessibilityLabel="Share this verse"
-          >
-            <Text style={styles.railBtnText}>↑</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.railBtn, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
-            onPress={handleShareCard}
-            activeOpacity={0.7}
-            accessibilityLabel="Share this verse as an image card"
-          >
-            <Text style={styles.railBtnText}>{sharingCard ? '…' : '🖼'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.railBtn, { backgroundColor: bookmarked ? theme.bronze : theme.bgCard, borderColor: theme.border }]}
-            onPress={toggleBookmark}
-            activeOpacity={0.7}
-            accessibilityLabel={bookmarked ? 'Remove bookmark from this verse' : 'Save this verse'}
-          >
-            <Text style={styles.railBtnText}>🔖</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.railBtn, { backgroundColor: memorizeMode ? 'rgba(201,162,39,0.18)' : theme.bgCard, borderColor: memorizeMode ? theme.goldText : theme.border }]}
-            onPress={toggleMemorizeMode}
-            activeOpacity={0.7}
-            accessibilityLabel="Memorize this verse"
-          >
-            <Text style={styles.railBtnText}>🧠</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.railBtn, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
-            onPress={() => setReciterModalOpen(true)}
-            activeOpacity={0.7}
-            accessibilityLabel="Choose reciter"
-          >
-            <Text style={styles.railBtnText}>🎙</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        </>)}
+        <PrayerModule
+          theme={theme}
+          bearing={bearing}
+          onOpenPrayerTimes={() => setPrayerClockOpen(true)}
+        />
+        <View style={{ height: 24 }} />
+      </ScrollView>
 
       {/* Reciter picker + this ayah's audio download — moved off the
           scroll into a modal behind the rail's reciter button. */}
@@ -1125,6 +1260,17 @@ export default function HomeScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <PrayerTimesModal
+        visible={prayerClockOpen}
+        onClose={() => setPrayerClockOpen(false)}
+        times={prayerTimes}
+        theme={theme}
+        onQibla={() => {
+          setPrayerClockOpen(false);
+          router.push('/qibla');
+        }}
+      />
 
       {/* Off-screen share card — laid out (so view-shot can capture it)
           but positioned far off-screen; never visible to the user. */}
@@ -1180,9 +1326,14 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
   },
   headerDate: {
-    fontFamily: 'Amiri_400Regular',
-    fontSize: 12,
-    letterSpacing: 0.5,
+    fontSize: 10,
+    letterSpacing: 0.4,
+  },
+  occasionLine: {
+    fontSize: 11.5,
+    textAlign: 'center',
+    paddingVertical: 7,
+    letterSpacing: 0.3,
   },
   scroll: { padding: 28, alignItems: 'center' },
   bismillah: {
@@ -1249,39 +1400,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Amiri_400Regular',
     fontSize: 13,
     textAlign: 'center',
-    marginBottom: 24,
-  },
-  streakBox: {
-    borderWidth: 0.5,
-    borderRadius: 2,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    marginTop: -8,
-    marginBottom: 20,
-    alignItems: 'center',
-    alignSelf: 'center',
-    maxWidth: '100%',
-  },
-  streakText: {
-    fontFamily: 'Amiri_400Regular',
-    fontSize: 11,
-    letterSpacing: 1.5,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-  },
-  streakMilestone: {
-    fontFamily: 'Amiri_400Regular',
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  streakMessage: {
-    fontFamily: 'Amiri_400Regular',
-    fontSize: 12,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    lineHeight: 17,
-    marginTop: 2,
+    marginBottom: 14,
   },
   actionBtn: {
     borderWidth: 0.5,
@@ -1347,23 +1466,6 @@ const styles = StyleSheet.create({
   pillInactive: { borderWidth: 0.5, paddingVertical: 5, paddingHorizontal: 14, borderRadius: 2 },
   pillTextActive: { color: '#fff', fontSize: 11, letterSpacing: 1 },
   pillTextInactive: { fontSize: 11, letterSpacing: 1 },
-  prayerStrip: { marginTop: 10, marginBottom: 4, width: '100%' },
-  prayerItem: {
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginRight: 4,
-    borderWidth: 0.5,
-    borderColor: 'rgba(201,162,39,0.2)',
-    borderRadius: 4,
-  },
-  prayerName: {
-    fontSize: 11,
-    color: '#8b6520',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-  prayerTime: { fontSize: 13, fontWeight: '500', marginTop: 2 },
   tafsirContainer: { width: '100%', marginTop: 8, gap: 8 },
   tafsirBtn: {
     borderWidth: 0.5,
@@ -1432,44 +1534,74 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 4,
   },
-  // Today tabs + floating rail + reciter modal (v1.0.5)
+  // Today tabs (v1.0.6: sage-track pill with a champagne active pill)
   tabBar: {
     flexDirection: 'row',
     marginHorizontal: 20,
     marginTop: 10,
     marginBottom: 2,
+    borderRadius: 999,
+    padding: 4,
+  },
+  tabBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 999 },
+  tabText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  // Prev/Next + verse actions + circle card (v1.0.6)
+  prevNextRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 4,
+    marginBottom: 14,
+  },
+  prevNextText: { fontSize: 13, fontWeight: '600' },
+  todayChip: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    letterSpacing: 1.5,
     borderWidth: 0.5,
-    borderRadius: 4,
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
     overflow: 'hidden',
   },
-  tabBtn: { flex: 1, paddingVertical: 9, alignItems: 'center' },
-  tabText: {
-    fontFamily: 'Amiri_400Regular',
-    fontSize: 12,
-    letterSpacing: 1.5,
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 34,
+    marginBottom: 20,
   },
-  rail: {
-    position: 'absolute',
-    right: 10,
-    top: '36%',
-    gap: 10,
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  railBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 10,
+  actionItem: { alignItems: 'center', gap: 7 },
+  actionCircle: {
+    width: 55,
+    height: 55,
+    borderRadius: 27.5,
     borderWidth: 0.5,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#1a1205',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowColor: '#2E2A24',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  railBtnText: { fontSize: 19 },
+  actionLabel: { fontSize: 11, fontWeight: '500' },
+  circleCard: {
+    width: '100%',
+    borderWidth: 0.5,
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 14,
+    alignItems: 'center',
+    gap: 8,
+  },
+  circleKicker: { fontSize: 10, letterSpacing: 2, fontWeight: '700' },
+  circleText: { fontSize: 12.5, lineHeight: 18, textAlign: 'center' },
+  circleLink: { fontSize: 11, letterSpacing: 1.5, fontWeight: '700' },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(13,10,4,0.45)',
