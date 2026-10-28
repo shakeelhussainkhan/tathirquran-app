@@ -13,9 +13,12 @@ import {
   localGetRangeTranslation,
   localGetRecentSchedule,
   localGetScheduleAyahId,
+  localGetMajmaTafsir,
   localGetSurahs,
   localGetTafsir,
+  MAJMA_SCHOLAR,
   type LocalJuzRange,
+  type LocalMajmaTafsir,
 } from './offlineDb';
 
 /**
@@ -141,6 +144,75 @@ export async function getAllTafsirForAyah(ayahId: number, languageCode: string =
         .eq('language_code', languageCode)
         .order('scholar');
       return data || [];
+    },
+  );
+}
+
+export type MajmaTafsir = LocalMajmaTafsir;
+
+/**
+ * Majma' al-Bayan (al-Tabarsi) Arabic commentary covering one ayah.
+ *
+ * The rows are stored one per commentary block, anchored at the block's
+ * first ayah (see localGetMajmaTafsir in lib/offlineDb.ts); the block
+ * covering an ayah is resolved from the anchors at read time. This is
+ * original-language scholarly commentary — it is fetched independently
+ * of the selected translation language. Returns null until the Majma'
+ * rows are loaded into the tafsir table.
+ */
+export async function getMajmaTafsirForAyah(
+  ayahId: number,
+  surahNumber: number,
+  ayahCount: number,
+): Promise<MajmaTafsir | null> {
+  return localFirst(
+    () => localGetMajmaTafsir(ayahId, surahNumber, ayahCount),
+    async () => {
+      const { data: anchors } = await supabase
+        .from('tafsir')
+        .select('*')
+        .eq('scholar', MAJMA_SCHOLAR)
+        .eq('language_code', 'ar')
+        .lte('ayah_id', ayahId)
+        .order('ayah_id', { ascending: false })
+        .limit(1);
+      const anchor = (anchors as any[] | null)?.[0];
+      if (!anchor) return null;
+      const coordOf = async (
+        id: number,
+      ): Promise<{ surah_number: number; ayah_number: number } | null> => {
+        const { data } = await supabase
+          .from('ayahs')
+          .select('surah_number, ayah_number')
+          .eq('ayah_id', id)
+          .single();
+        return (data as { surah_number: number; ayah_number: number } | null) ?? null;
+      };
+      const anchorCoord = await coordOf(anchor.ayah_id);
+      if (!anchorCoord || anchorCoord.surah_number !== surahNumber) return null;
+      let ayahTo = ayahCount > 0 ? ayahCount : anchorCoord.ayah_number;
+      const { data: nextRows } = await supabase
+        .from('tafsir')
+        .select('ayah_id')
+        .eq('scholar', MAJMA_SCHOLAR)
+        .eq('language_code', 'ar')
+        .gt('ayah_id', anchor.ayah_id)
+        .order('ayah_id', { ascending: true })
+        .limit(1);
+      const nextId = (nextRows as any[] | null)?.[0]?.ayah_id;
+      if (typeof nextId === 'number') {
+        const nextCoord = await coordOf(nextId);
+        if (nextCoord && nextCoord.surah_number === surahNumber) {
+          ayahTo = nextCoord.ayah_number - 1;
+        }
+      }
+      return {
+        text: anchor.text ?? '',
+        sourceBook: anchor.source_book ?? null,
+        surah: surahNumber,
+        ayahFrom: anchorCoord.ayah_number,
+        ayahTo,
+      };
     },
   );
 }
@@ -476,7 +548,14 @@ export async function getAyahDetail(surahNumber: number, ayahNumber: number) {
 
   const tafsirEntries = await getAllTafsirForAyah(ayah.ayah_id, 'en');
 
-  return { ayah, translations, tafsirEntries };
+  // Majma' al-Bayan Arabic commentary for this ayah (null until loaded).
+  const majmaTafsir = await getMajmaTafsirForAyah(
+    ayah.ayah_id,
+    surahNumber,
+    ayah.surahs?.ayah_count ?? 0,
+  );
+
+  return { ayah, translations, tafsirEntries, majmaTafsir };
 }
 
 // ---------- Verse reader ranges (Mushaf / Juz / Khatmah portions) ----------

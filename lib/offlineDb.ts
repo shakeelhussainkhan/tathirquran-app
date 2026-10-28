@@ -569,6 +569,71 @@ export async function localGetTafsir(ayahId: number, languageCode: string): Prom
   );
 }
 
+/** Scholar label of the Majma' al-Bayan rows, exactly as loaded. */
+export const MAJMA_SCHOLAR = 'الطبرسي — مجمع البيان';
+
+export interface LocalMajmaTafsir {
+  text: string;
+  sourceBook: string | null;
+  surah: number;
+  ayahFrom: number;
+  ayahTo: number;
+}
+
+/**
+ * Majma' al-Bayan (al-Tabarsi) Arabic commentary covering one ayah.
+ *
+ * The load stores ONE row per commentary block, anchored at the global
+ * ayah_id of the block's first ayah. The blocks tile every surah without
+ * gaps, so the block covering an ayah is the anchored row with the
+ * greatest ayah_id <= the ayah's own, and the block ends the ayah before
+ * the next anchor in the same surah (or at the surah's last ayah). The
+ * range is derived from the anchors themselves — no schema change.
+ * Returns null when no Majma' rows are present.
+ */
+export async function localGetMajmaTafsir(
+  ayahId: number,
+  surahNumber: number,
+  ayahCount: number,
+): Promise<LocalMajmaTafsir | null> {
+  const db = await getOfflineDb();
+  if (!db) return null;
+  const anchors = await db.getAllAsync<Row>(
+    "SELECT * FROM tafsir WHERE scholar = ? AND language_code = 'ar' AND ayah_id <= ? ORDER BY ayah_id DESC LIMIT 1",
+    [MAJMA_SCHOLAR, ayahId],
+  );
+  const anchor = anchors[0];
+  if (!anchor || typeof anchor.ayah_id !== 'number') return null;
+  const anchorCoord = await db.getFirstAsync<{ surah_number: number; ayah_number: number }>(
+    'SELECT surah_number, ayah_number FROM ayahs WHERE ayah_id = ?',
+    [anchor.ayah_id],
+  );
+  // Anchors never cross a surah boundary; if the nearest anchor belongs
+  // to an earlier surah, this ayah's block is not loaded.
+  if (!anchorCoord || anchorCoord.surah_number !== surahNumber) return null;
+  let ayahTo = ayahCount > 0 ? ayahCount : anchorCoord.ayah_number;
+  const next = await db.getFirstAsync<{ ayah_id: number }>(
+    "SELECT ayah_id FROM tafsir WHERE scholar = ? AND language_code = 'ar' AND ayah_id > ? ORDER BY ayah_id ASC LIMIT 1",
+    [MAJMA_SCHOLAR, anchor.ayah_id],
+  );
+  if (next && typeof next.ayah_id === 'number') {
+    const nextCoord = await db.getFirstAsync<{ surah_number: number; ayah_number: number }>(
+      'SELECT surah_number, ayah_number FROM ayahs WHERE ayah_id = ?',
+      [next.ayah_id],
+    );
+    if (nextCoord && nextCoord.surah_number === surahNumber) {
+      ayahTo = nextCoord.ayah_number - 1;
+    }
+  }
+  return {
+    text: typeof anchor.text === 'string' ? anchor.text : '',
+    sourceBook: typeof anchor.source_book === 'string' ? anchor.source_book : null,
+    surah: surahNumber,
+    ayahFrom: anchorCoord.ayah_number,
+    ayahTo,
+  };
+}
+
 export interface LocalScheduleRow {
   schedule_date: string;
   ayah_id: number;

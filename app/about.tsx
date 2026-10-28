@@ -94,6 +94,20 @@ export default function AboutScreen() {
           Wikimedia Commons.
         </Text>
 
+        {/* Majma' al-Bayan credit — the full CC BY-NC-SA 4.0 attribution
+            for the Arabic tafsir shown with each verse. */}
+        <Text style={styles.creditText}>
+          Commentary: al-Tabarsi, Majma' al-Bayan fi Tafsir al-Qur'an, via
+          OpenITI (release 2025.1.9), text URI
+          0548IbnHasanTabarsi.TafsirMajmacBayan.Tafsir04003-ara1 — licensed
+          CC BY-NC-SA 4.0. Changes: the text was segmented per verse-range
+          and edition page markers were removed; wording is otherwise
+          verbatim. This dataset is shared under CC BY-NC-SA 4.0.
+        </Text>
+        <TouchableOpacity onPress={() => Linking.openURL('https://creativecommons.org/licenses/by-nc-sa/4.0/')}>
+          <Text style={styles.email}>CC BY-NC-SA 4.0 — creativecommons.org</Text>
+        </TouchableOpacity>
+
         <View style={styles.divider} />
 
         {/* Built by */}

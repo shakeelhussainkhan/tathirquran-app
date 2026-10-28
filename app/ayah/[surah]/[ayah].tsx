@@ -16,6 +16,14 @@ import NoteTagsEditor from '../../../components/NoteTagsEditor';
 const REFLECTION_NOTE =
   'Written by the TathirQuran team to aid reflection. Not a quotation from any tafsir. Under review by scholars.';
 
+// Majma' al-Bayan (al-Tabarsi) attribution, verbatim from the feasibility
+// report (§5) — the CC BY-NC-SA 4.0 credit lines shown with the tafsir
+// section below (credit + licence + the changes made to the source text).
+const MAJMA_ATTRIBUTION_AR =
+  'التفسير: الطبرسي، مجمع البيان في تفسير القرآن، عبر مكتبة OpenITI (إصدار 2025.1.9)، النصّ من altafsir.com. مرخّص بموجب CC BY-NC-SA 4.0 — جرى تقسيم النصّ على الآيات وحذف علامات صفحات الطبعة، والمتن بنصّه دون تغيير.';
+const MAJMA_ATTRIBUTION_EN =
+  "Commentary: al-Tabarsi, Majma' al-Bayan fi Tafsir al-Qur'an, via OpenITI (release 2025.1.9), text URI 0548IbnHasanTabarsi.TafsirMajmacBayan.Tafsir04003-ara1 — https://github.com/OpenITI/0550AH — licensed CC BY-NC-SA 4.0 (https://creativecommons.org/licenses/by-nc-sa/4.0/). Changes: the text was segmented per verse-range and edition page markers were removed; wording is otherwise verbatim. This dataset is shared under CC BY-NC-SA 4.0.";
+
 const isRtlLang = (code: string) => code === 'ar' || code === 'fa' || code === 'ur';
 
 /**
@@ -245,6 +253,39 @@ export default function AyahDetailScreen() {
             </View>
           )}
 
+          {/* Majma' al-Bayan (al-Tabarsi) — Arabic tafsir via OpenITI,
+              CC BY-NC-SA 4.0. The block whose verse range contains this
+              ayah, with the range stated. Kept separate from the
+              Reflection entries above and from the translations: it is
+              the original-language scholarly commentary, so it shows
+              regardless of the selected translation language. Renders
+              only once the Majma' rows are loaded. */}
+          {detail.majmaTafsir && (
+            <View style={[styles.tafsirBlock, { borderLeftColor: theme.gold }]}>
+              <View style={styles.majmaHeadingRow}>
+                <Text style={[styles.majmaHeadingAr, { color: theme.goldText }]}>التفسير</Text>
+                <Text style={[styles.tafsirLabel, { color: theme.textSecondary }]}>TAFSIR</Text>
+              </View>
+              <Text style={[styles.majmaScholar, { color: theme.text }]}>
+                الطبرسي — مجمع البيان
+              </Text>
+              <Text style={[styles.scholar, { color: theme.textSecondary }]}>
+                {detail.majmaTafsir.ayahFrom === detail.majmaTafsir.ayahTo
+                  ? `Verse ${detail.majmaTafsir.surah}:${detail.majmaTafsir.ayahFrom}`
+                  : `Verses ${detail.majmaTafsir.surah}:${detail.majmaTafsir.ayahFrom}–${detail.majmaTafsir.ayahTo}`}
+              </Text>
+              <Text style={[styles.majmaText, { color: theme.text }]}>
+                {detail.majmaTafsir.text}
+              </Text>
+              <Text style={[styles.majmaAttributionAr, { color: theme.textSecondary }]}>
+                {MAJMA_ATTRIBUTION_AR}
+              </Text>
+              <Text style={[styles.majmaAttribution, { color: theme.textSecondary }]}>
+                {MAJMA_ATTRIBUTION_EN}
+              </Text>
+            </View>
+          )}
+
           {/* Personal note & tags (stored on this device only) */}
           <NoteTagsEditor
             key={`${surahNumber}_${ayahNumber}`}
@@ -405,6 +446,44 @@ const styles = StyleSheet.create({
     fontFamily: 'Amiri_400Regular',
     fontSize: 15,
     lineHeight: 24,
+  },
+  majmaHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 10,
+    marginBottom: 2,
+  },
+  majmaHeadingAr: {
+    fontFamily: 'Amiri_700Bold',
+    fontSize: 20,
+  },
+  majmaScholar: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 15,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  majmaText: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 17,
+    lineHeight: 34,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    marginTop: 8,
+  },
+  majmaAttributionAr: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 11,
+    lineHeight: 20,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    marginTop: 10,
+  },
+  majmaAttribution: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 4,
   },
   nav: {
     flexDirection: 'row',
