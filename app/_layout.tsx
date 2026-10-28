@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import Onboarding from './onboarding';
+import UpdatePrompt from '../components/UpdatePrompt';
 import { ensureOfflineData } from '../lib/offlineDb';
 import { refreshPrayerAlerts } from '../lib/prayerAlerts';
 
@@ -138,6 +139,11 @@ export default function RootLayout() {
         <Tabs.Screen name="ayah/[surah]/[ayah]" options={{ href: null }} />
         <Tabs.Screen name="devotional/[slug]" options={{ href: null }} />
       </Tabs>
+      {/* Soft "new version available" prompt (lib/updateCheck.ts):
+          checks the App Store at most once per 24h, shows only when a
+          newer version is live, always dismissible. Renders nothing
+          otherwise — never blocks the app. */}
+      <UpdatePrompt />
     </SafeAreaProvider>
   );
 }
