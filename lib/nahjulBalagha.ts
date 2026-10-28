@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import quotesData from './nahjulBalaghaQuotes.json';
 
 /**
@@ -10,6 +11,17 @@ import quotesData from './nahjulBalaghaQuotes.json';
  * translator, fetch + cross-check notes, curation rules) lives in the
  * JSON file's "meta" block. Never add sayings from memory or from another
  * translation; extend the JSON from the same source instead.
+ *
+ * Arabic (textAr) and Urdu (textUr) were added under the same rule
+ * (quote-translations feature): Arabic verbatim from the same chapter's
+ * per-saying posts on hadith.net (Ahlul Bayt DIL), where the Arabic is
+ * printed interleaved with this same Ali Raza translation; Urdu verbatim
+ * from Allama Mufti Jafar Hussain's translation as published by Markaz
+ * Afkar-e-Islami (afkareislami.com), translation text only — his sharh
+ * (commentary) is never included. Per-language provenance, alignment
+ * method and curation notes live in the JSON "meta" block ("translations"
+ * key). A saying whose Arabic or Urdu could not be verified verbatim
+ * simply omits that field; the card falls back to the English.
  *
  * The data is bundled (offline-first, like the rest of the app): no network
  * call, no Supabase row, so the quote is available in airplane mode and is
@@ -26,11 +38,18 @@ import quotesData from './nahjulBalaghaQuotes.json';
 export interface NahjulBalaghaQuote {
   /** Saying number in the al-islam.org chapter ("Hadith n. N"). */
   number: number;
-  /** The saying, verbatim (attribution prefix rendered by the UI). */
+  /** The saying in English, verbatim (attribution prefix rendered by the UI). */
   text: string;
+  /** The saying in the original Arabic, verbatim from hadith.net (see JSON meta). Absent when not yet verified. */
+  textAr?: string;
+  /** The saying in Urdu (Mufti Jafar Hussain), verbatim (see JSON meta). Absent when not yet verified. */
+  textUr?: string;
   /** Chapter URL the text was transcribed from (see JSON meta). */
   sourceUrl: string;
 }
+
+/** Languages the quote card can display. */
+export type QuoteLanguage = 'en' | 'ar' | 'ur';
 
 export const NAHJUL_BALAGHA_QUOTES: NahjulBalaghaQuote[] = quotesData.sayings;
 
@@ -39,8 +58,60 @@ export function quoteAttribution(quote: NahjulBalaghaQuote): string {
   return `Nahjul Balagha, Saying ${quote.number} — Imam Ali ibn Abi Talib (AS)`;
 }
 
-/** Translator credit, shown wherever a quote displays. */
+/** Translator credit, shown wherever a quote displays (English). */
 export const NAHJUL_BALAGHA_TRANSLATOR = 'Translation by Syed Ali Raza';
+
+/** Translator credit for the Urdu text (Mufti Jafar Hussain). */
+export const NAHJUL_BALAGHA_TRANSLATOR_UR =
+  'Urdu translation by Allama Mufti Jafar Hussain';
+
+/** Credit line for the Arabic text — the original words; no translator. */
+export const NAHJUL_BALAGHA_ARABIC_CREDIT = 'Original Arabic text';
+
+/** The credit line matching the language actually displayed. */
+export function quoteCredit(lang: QuoteLanguage): string {
+  if (lang === 'ur') return NAHJUL_BALAGHA_TRANSLATOR_UR;
+  if (lang === 'ar') return NAHJUL_BALAGHA_ARABIC_CREDIT;
+  return NAHJUL_BALAGHA_TRANSLATOR;
+}
+
+/**
+ * The text to display for a language choice. Falls back to the English
+ * when the saying has no verified text in the chosen language; the
+ * returned `lang` is the language actually shown (drives the credit
+ * line and RTL rendering), so a fallback never credits the wrong text.
+ */
+export function quoteText(
+  quote: NahjulBalaghaQuote,
+  lang: QuoteLanguage,
+): { text: string; lang: QuoteLanguage } {
+  if (lang === 'ar' && quote.textAr) return { text: quote.textAr, lang: 'ar' };
+  if (lang === 'ur' && quote.textUr) return { text: quote.textUr, lang: 'ur' };
+  return { text: quote.text, lang: 'en' };
+}
+
+/** AsyncStorage key for the quote card's language choice. */
+export const QUOTE_LANGUAGE_STORAGE_KEY = 'nb_quote_language';
+
+/** Read the persisted quote language. Never throws; defaults to English. */
+export async function getQuoteLanguage(): Promise<QuoteLanguage> {
+  try {
+    const val = await AsyncStorage.getItem(QUOTE_LANGUAGE_STORAGE_KEY);
+    if (val === 'ar' || val === 'ur' || val === 'en') return val;
+  } catch {
+    /* fall through to the default */
+  }
+  return 'en';
+}
+
+/** Persist the quote language choice under `nb_quote_language`. */
+export async function setQuoteLanguage(lang: QuoteLanguage): Promise<void> {
+  try {
+    await AsyncStorage.setItem(QUOTE_LANGUAGE_STORAGE_KEY, lang);
+  } catch {
+    /* persistence is best-effort; the in-memory choice still applies */
+  }
+}
 
 /** Whole days since 1970-01-01 UTC for the given date (UTC calendar day). */
 export function utcDayNumber(date: Date): number {
