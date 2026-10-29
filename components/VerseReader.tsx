@@ -1,7 +1,7 @@
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
@@ -28,6 +28,11 @@ import { useTheme } from '../lib/theme';
  * All text comes from the app's existing local-first data layer
  * (lib/queries.ts getAyahRange / getRangeTranslation): the full Quran text
  * and translations the app already downloads for offline use.
+ *
+ * The header carries a real "Play all" control: continuous playback from
+ * the first ayah of the list, advancing ayah-by-ayah as each recitation
+ * finishes. (The old hint line's "▶" was inert text that iOS rendered as
+ * a blue emoji button; users tapped it expecting exactly this.)
  */
 
 const BISMILLAH = 'بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ';
@@ -83,8 +88,40 @@ export default function VerseReader({
   const playerStatus = useAudioPlayerStatus(player);
   const loadedAudioUri = useRef<string | null>(null);
 
+  // Continuous ("Play all") playback: when active, the finish handler
+  // advances to the next ayah instead of just clearing the marker.
+  // `continuous` drives the header button's label; the ref mirror lets
+  // the status effect and async advance loop read the live value.
+  const [continuous, setContinuous] = useState(false);
+  const continuousRef = useRef(false);
+  const advancingRef = useRef(false);
+  const playingIdRef = useRef<number | null>(null);
+  const ayahsRef = useRef<ReaderAyah[]>([]);
+  const playAyahRef = useRef<((ayah: ReaderAyah) => Promise<boolean>) | null>(null);
+
+  const setContinuousBoth = useCallback((value: boolean) => {
+    continuousRef.current = value;
+    setContinuous(value);
+  }, []);
+
+  // The list's ayahs in reading order (rows also carry header rows).
+  const ayahs = useMemo(
+    () => rows.flatMap((r) => (r.kind === 'ayah' ? [r.ayah] : [])),
+    [rows],
+  );
+
+  useEffect(() => {
+    ayahsRef.current = ayahs;
+  }, [ayahs]);
+
+  useEffect(() => {
+    playingIdRef.current = playingId;
+  }, [playingId]);
+
   useEffect(() => {
     let cancelled = false;
+    // A new range starts fresh: any continuous queue belongs to the old one.
+    setContinuousBoth(false);
     (async () => {
       setLoading(true);
       setUnavailable(false);
@@ -159,9 +196,11 @@ export default function VerseReader({
     };
   }, [startAyahId, endAyahId]);
 
-  // Stop playback when leaving the reader.
+  // Stop playback when leaving the reader (and drop any queued
+  // continuous advance with it).
   useEffect(() => {
     return () => {
+      continuousRef.current = false;
       try {
         player.pause();
       } catch {
@@ -171,13 +210,74 @@ export default function VerseReader({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Clear the playing marker when a recitation finishes.
+  /**
+   * Load one ayah's recitation and play it. Returns false when the audio
+   * could not be loaded/played (audio is best-effort throughout), so
+   * continuous playback can skip past a bad file instead of stalling.
+   */
+  const playAyah = useCallback(
+    async (ayah: ReaderAyah): Promise<boolean> => {
+      try {
+        const uri = await resolvePlaybackUri(reciter, ayah.surah_number, ayah.ayah_number);
+        if (loadedAudioUri.current === uri && player.duration > 0) {
+          setPlayingId(ayah.ayah_id);
+          player.play();
+          return true;
+        }
+        await setAudioModeAsync({ playsInSilentMode: true });
+        player.replace({ uri });
+        loadedAudioUri.current = uri;
+        setPlayingId(ayah.ayah_id);
+        player.play();
+        return true;
+      } catch {
+        // Audio is best-effort; the text remains fully readable.
+        return false;
+      }
+    },
+    [player, reciter],
+  );
+
   useEffect(() => {
-    if (playerStatus.didJustFinish) setPlayingId(null);
-  }, [playerStatus.didJustFinish]);
+    playAyahRef.current = playAyah;
+  }, [playAyah]);
+
+  // When a recitation finishes: single-verse playback just clears the
+  // playing marker (as before); continuous playback advances to the next
+  // ayah in the list, skipping any that fail to load, and stops cleanly
+  // after the last one.
+  useEffect(() => {
+    if (!playerStatus.didJustFinish) return;
+    if (!continuousRef.current) {
+      setPlayingId(null);
+      return;
+    }
+    if (advancingRef.current) return;
+    advancingRef.current = true;
+    (async () => {
+      try {
+        const list = ayahsRef.current;
+        const idx = list.findIndex((a) => a.ayah_id === playingIdRef.current);
+        if (idx >= 0) {
+          for (let i = idx + 1; i < list.length; i++) {
+            if (!continuousRef.current) return;
+            const play = playAyahRef.current;
+            if (play && (await play(list[i]))) return;
+          }
+        }
+        // Last ayah (or the position was lost): stop and reset.
+        setContinuousBoth(false);
+        setPlayingId(null);
+      } finally {
+        advancingRef.current = false;
+      }
+    })();
+  }, [playerStatus.didJustFinish, setContinuousBoth]);
 
   const togglePlay = useCallback(
     async (ayah: ReaderAyah) => {
+      // A per-verse tap always takes over: continuous playback is cancelled.
+      setContinuousBoth(false);
       try {
         if (playingId === ayah.ayah_id) {
           if (player.playing) {
@@ -187,23 +287,45 @@ export default function VerseReader({
           }
           return;
         }
-        const uri = await resolvePlaybackUri(reciter, ayah.surah_number, ayah.ayah_number);
-        if (loadedAudioUri.current === uri && player.duration > 0) {
-          setPlayingId(ayah.ayah_id);
+      } catch {
+        // Audio is best-effort; the text remains fully readable.
+        return;
+      }
+      await playAyah(ayah);
+    },
+    [player, playingId, playAyah, setContinuousBoth],
+  );
+
+  /**
+   * Header "Play all" control. First tap starts continuous playback at
+   * the first ayah of the list; while the queue is active the same
+   * button pauses, and resumes the current ayah when tapped again.
+   */
+  const togglePlayAll = useCallback(async () => {
+    if (continuousRef.current) {
+      try {
+        if (player.playing) {
+          player.pause();
+        } else {
           player.play();
-          return;
         }
-        await setAudioModeAsync({ playsInSilentMode: true });
-        player.replace({ uri });
-        loadedAudioUri.current = uri;
-        setPlayingId(ayah.ayah_id);
-        player.play();
       } catch {
         // Audio is best-effort; the text remains fully readable.
       }
-    },
-    [player, playingId, reciter],
-  );
+      return;
+    }
+    const list = ayahsRef.current;
+    if (list.length === 0) return;
+    setContinuousBoth(true);
+    // Skip forward past any ayah that fails to load, so one bad file
+    // cannot stall the whole list before it has even started.
+    for (const ayah of list) {
+      if (!continuousRef.current) return;
+      if (await playAyah(ayah)) return;
+    }
+    setContinuousBoth(false);
+    setPlayingId(null);
+  }, [player, playAyah, setContinuousBoth]);
 
   const s = makeStyles(theme);
 
@@ -293,6 +415,14 @@ export default function VerseReader({
     );
   };
 
+  // "Play all" is the neutral label: this reader renders a surah, a juz,
+  // or a Khatmah portion depending on the route, never just one thing.
+  const playAllLabel = !continuous
+    ? '▶ Play all'
+    : playerStatus.playing
+      ? '⏸ Pause'
+      : '▶ Resume';
+
   return (
     <FlatList
       data={rows}
@@ -316,8 +446,22 @@ export default function VerseReader({
             </Text>
           ) : null}
           <Text style={[s.hint, { color: theme.textSecondary }]}>
-            Tap a verse to open it · ▶ to listen
+            Tap a verse to open it · Play all to listen in order
           </Text>
+          <TouchableOpacity
+            style={[s.playAllBtn, { backgroundColor: theme.bronze }]}
+            onPress={togglePlayAll}
+            activeOpacity={0.7}
+            accessibilityLabel={
+              !continuous
+                ? 'Play all verses in order'
+                : playerStatus.playing
+                  ? 'Pause recitation'
+                  : 'Resume recitation'
+            }
+          >
+            <Text style={s.playAllBtnText}>{playAllLabel}</Text>
+          </TouchableOpacity>
         </View>
       }
       ListFooterComponent={
@@ -384,6 +528,19 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
       fontStyle: 'italic',
       textAlign: 'center',
       marginBottom: 8,
+    },
+    playAllBtn: {
+      paddingVertical: 11,
+      paddingHorizontal: 18,
+      borderRadius: 2,
+      marginTop: 4,
+      marginBottom: 8,
+    },
+    playAllBtnText: {
+      color: '#fff',
+      fontSize: 11,
+      letterSpacing: 1.5,
+      fontFamily: 'Amiri_400Regular',
     },
     surahHeader: {
       alignItems: 'center',
