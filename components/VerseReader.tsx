@@ -33,6 +33,15 @@ import { useTheme } from '../lib/theme';
  * the first ayah of the list, advancing ayah-by-ayah as each recitation
  * finishes. (The old hint line's "▶" was inert text that iOS rendered as
  * a blue emoji button; users tapped it expecting exactly this.)
+ *
+ * Once audio is engaged — the continuous queue, or a single verse tapped
+ * in the list — a compact mini-player bar sits in-flow above the list,
+ * outside the FlatList, so it never scrolls away: pause/resume, stop,
+ * and the current verse reference (plus the position within the list in
+ * continuous mode). Testers reading a long surah (Ya Sin, 83 verses)
+ * asked for control without scrolling back to the top. While the bar is
+ * visible it is the control surface; the header button is the entry
+ * point and yields to it.
  */
 
 const BISMILLAH = 'بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ';
@@ -327,6 +336,43 @@ export default function VerseReader({
     setPlayingId(null);
   }, [player, playAyah, setContinuousBoth]);
 
+  /**
+   * Mini-player stop: end playback entirely — cancel any continuous
+   * queue, pause, forget the loaded file (so the next play starts its
+   * ayah from the beginning rather than resuming mid-verse) and clear
+   * the playing marker, which also hides the bar.
+   */
+  const stopPlayback = useCallback(() => {
+    setContinuousBoth(false);
+    loadedAudioUri.current = null;
+    try {
+      player.pause();
+    } catch {
+      // Audio is best-effort; the text remains fully readable.
+    }
+    setPlayingId(null);
+  }, [player, setContinuousBoth]);
+
+  /**
+   * Mini-player pause/resume. Both playback modes share the one player
+   * and its loaded source is always the current ayah, so a bare
+   * pause/play on the player is the whole behaviour — the same thing
+   * the header button and the per-verse button do for the ayah they
+   * control. A continuous queue paused this way stays queued: on
+   * finish, the advance effect picks up from the current ayah as usual.
+   */
+  const toggleBarPlayPause = useCallback(() => {
+    try {
+      if (player.playing) {
+        player.pause();
+      } else {
+        player.play();
+      }
+    } catch {
+      // Audio is best-effort; the text remains fully readable.
+    }
+  }, [player]);
+
   const s = makeStyles(theme);
 
   if (loading) {
@@ -423,8 +469,54 @@ export default function VerseReader({
       ? '⏸ Pause'
       : '▶ Resume';
 
+  // Mini-player: shown while audio is engaged from this reader — the
+  // continuous queue is active, or a verse is loaded (playing or
+  // paused). It drives the same shared player state as every other
+  // control; the header "Play all" button hides while it is up so
+  // there is exactly one control surface at a time.
+  const showMiniPlayer = continuous || playingId != null;
+  const currentIndex =
+    playingId == null ? -1 : ayahs.findIndex((a) => a.ayah_id === playingId);
+  const currentAyah = currentIndex >= 0 ? ayahs[currentIndex] : null;
+
   return (
+    <View style={s.root}>
+      {showMiniPlayer ? (
+        <View
+          style={[
+            s.miniPlayer,
+            { backgroundColor: theme.bgSoft, borderBottomColor: theme.border },
+          ]}
+        >
+          <TouchableOpacity
+            onPress={toggleBarPlayPause}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            accessibilityLabel={
+              playerStatus.playing ? 'Pause recitation' : 'Resume recitation'
+            }
+          >
+            <Text style={[s.miniBtn, { color: theme.goldText }]}>
+              {playerStatus.playing ? '⏸' : '▶'}
+            </Text>
+          </TouchableOpacity>
+          <Text style={[s.miniRef, { color: theme.text }]}>
+            {currentAyah
+              ? `${currentAyah.surah_number}:${currentAyah.ayah_number}${
+                  continuous ? `  ·  ${currentIndex + 1} of ${ayahs.length}` : ''
+                }`
+              : 'Recitation'}
+          </Text>
+          <TouchableOpacity
+            onPress={stopPlayback}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            accessibilityLabel="Stop recitation"
+          >
+            <Text style={[s.miniBtn, { color: theme.goldText }]}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     <FlatList
+      style={s.listFlex}
       data={rows}
       keyExtractor={(item) => item.key}
       renderItem={renderRow}
@@ -448,20 +540,22 @@ export default function VerseReader({
           <Text style={[s.hint, { color: theme.textSecondary }]}>
             Tap a verse to open it · Play all to listen in order
           </Text>
-          <TouchableOpacity
-            style={[s.playAllBtn, { backgroundColor: theme.bronze }]}
-            onPress={togglePlayAll}
-            activeOpacity={0.7}
-            accessibilityLabel={
-              !continuous
-                ? 'Play all verses in order'
-                : playerStatus.playing
-                  ? 'Pause recitation'
-                  : 'Resume recitation'
-            }
-          >
-            <Text style={s.playAllBtnText}>{playAllLabel}</Text>
-          </TouchableOpacity>
+          {!showMiniPlayer ? (
+            <TouchableOpacity
+              style={[s.playAllBtn, { backgroundColor: theme.bronze }]}
+              onPress={togglePlayAll}
+              activeOpacity={0.7}
+              accessibilityLabel={
+                !continuous
+                  ? 'Play all verses in order'
+                  : playerStatus.playing
+                    ? 'Pause recitation'
+                    : 'Resume recitation'
+              }
+            >
+              <Text style={s.playAllBtnText}>{playAllLabel}</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       }
       ListFooterComponent={
@@ -482,6 +576,7 @@ export default function VerseReader({
         ) : null
       }
     />
+    </View>
   );
 }
 
@@ -500,6 +595,22 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
       fontSize: 13,
       textAlign: 'center',
       lineHeight: 20,
+    },
+    root: { flex: 1 },
+    listFlex: { flex: 1 },
+    miniPlayer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 8,
+      paddingHorizontal: 24,
+      borderBottomWidth: 0.5,
+    },
+    miniBtn: { fontSize: 16, paddingHorizontal: 4 },
+    miniRef: {
+      fontFamily: 'Amiri_400Regular',
+      fontSize: 13,
+      letterSpacing: 1,
     },
     list: { paddingHorizontal: 24, paddingBottom: 40 },
     listHeader: { alignItems: 'center', paddingTop: 20, paddingBottom: 8 },
