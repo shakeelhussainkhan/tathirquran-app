@@ -229,6 +229,14 @@ export default function VerseReader({
       try {
         const uri = await resolvePlaybackUri(reciter, ayah.surah_number, ayah.ayah_number);
         if (loadedAudioUri.current === uri && player.duration > 0) {
+          // The loaded source may already have played to the end: the
+          // player then sits at end-of-stream and a bare play() is a
+          // silent no-op, which left this ayah un-replayable until the
+          // screen was remounted. playAyah is only ever called to START
+          // an ayah (pause/resume calls player.play() directly), so
+          // rewind first — the same restart pattern as the azan preview
+          // in app/settings.tsx.
+          await player.seekTo(0).catch(() => {});
           setPlayingId(ayah.ayah_id);
           player.play();
           return true;
