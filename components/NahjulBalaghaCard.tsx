@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useTheme } from '../lib/theme';
+import ListenButton from './ListenButton';
 import {
   quoteAttribution,
   quoteCredit,
@@ -112,6 +113,16 @@ export default function NahjulBalaghaCard({ quote }: { quote: NahjulBalaghaQuote
       <Text style={[styles.translator, { color: theme.textSecondary }]}>
         {quoteCredit(shownLang)}
       </Text>
+
+      {/* Listen-aloud (1.0.8): reads the saying in the language actually
+          displayed (the toggle's shown language, incl. English fallback). */}
+      <View style={styles.listenWrap}>
+        <ListenButton
+          sectionId={`nahjul-quote-${quote.number}`}
+          text={text}
+          language={shownLang}
+        />
+      </View>
     </View>
   );
 }
@@ -174,6 +185,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
   },
+  listenWrap: { marginTop: 12 },
   translator: {
     fontFamily: 'Amiri_400Regular',
     fontSize: 11,
