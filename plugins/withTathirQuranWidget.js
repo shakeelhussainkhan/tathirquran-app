@@ -153,11 +153,21 @@ const withTathirQuranWidget = (config) => {
       console.log(`[withTathirQuranWidget] Copied widget sources to ${widgetDir}`);
 
       // 2a. Write ASC API key to /tmp for xcodebuild -authenticationKeyPath
+      // Pentest 2026-10-31: this is a live private key on disk for the
+      // duration of the build — owner-only permissions, and tighten a
+      // pre-existing loose file rather than leaving its permissions as-is.
       const ascKeyPath = '/tmp/asc_api_key_tathirquran.p8';
       const ascKeyP8 = process.env.EXPO_ASC_KEY_P8;
       if (ascKeyP8 && !fs.existsSync(ascKeyPath)) {
-        fs.writeFileSync(ascKeyPath, ascKeyP8);
+        fs.writeFileSync(ascKeyPath, ascKeyP8, { mode: 0o600 });
         console.log(`[withTathirQuranWidget] Wrote ASC API key to ${ascKeyPath}`);
+      }
+      if (fs.existsSync(ascKeyPath)) {
+        try {
+          fs.chmodSync(ascKeyPath, 0o600);
+        } catch {
+          // Non-fatal: the build can proceed; permissions stay as they were.
+        }
       }
 
       // 2b. Write custom Gymfile so EAS uses it instead of generating its own
