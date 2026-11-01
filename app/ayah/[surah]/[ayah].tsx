@@ -24,6 +24,13 @@ const MAJMA_ATTRIBUTION_AR =
 const MAJMA_ATTRIBUTION_EN =
   "Commentary: al-Tabarsi, Majma' al-Bayan fi Tafsir al-Qur'an, via OpenITI (release 2025.1.9), text URI 0548IbnHasanTabarsi.TafsirMajmacBayan.Tafsir04003-ara1 — https://github.com/OpenITI/0550AH — licensed CC BY-NC-SA 4.0 (https://creativecommons.org/licenses/by-nc-sa/4.0/). Changes: the text was segmented per verse-range and edition page markers were removed; wording is otherwise verbatim. This dataset is shared under CC BY-NC-SA 4.0.";
 
+// Tafsir-e-Namoona attribution — a condition of the permission granted
+// 2026-11-01 (Fi Sabeelillah, free non-commercial use): this exact line
+// is shown with every Namoona section, and the full credit is on the
+// About screen.
+const NAMOONA_ATTRIBUTION =
+  'Tafsir-e-Namoona by Ayatullah Naser Makarem Shirazi — Urdu Translation by Safdar Husain Najafi';
+
 const isRtlLang = (code: string) => code === 'ar' || code === 'fa' || code === 'ur';
 
 /**
@@ -286,6 +293,38 @@ export default function AyahDetailScreen() {
             </View>
           )}
 
+          {/* Tafsir-e-Namoona (Makarem Shirazi) — Urdu tafsir, included
+              with permission (granted 2026-11-01), Fi Sabeelillah, for
+              free non-commercial use. The block whose verse range
+              contains this ayah, with the range stated — same block
+              model as the Majma' section above. Renders only once the
+              Namoona rows are loaded. The attribution line below is a
+              condition of the permission and appears with the section
+              every time it is shown. */}
+          {detail.namoonaTafsir && (
+            <View style={[styles.tafsirBlock, { borderLeftColor: theme.gold }]}>
+              <View style={styles.majmaHeadingRow}>
+                <Text style={[styles.namoonaHeadingUr, { color: theme.goldText }]}>اردو تفسیر</Text>
+                <Text style={[styles.tafsirLabel, { color: theme.textSecondary }]}>TAFSIR-E-NAMOONA</Text>
+              </View>
+              <Text style={[styles.namoonaScholar, { color: theme.text }]}>
+                Makarem Shirazi — Tafsir-e-Namoona
+              </Text>
+              <Text style={[styles.scholar, { color: theme.textSecondary }]}>
+                {detail.namoonaTafsir.ayahFrom === detail.namoonaTafsir.ayahTo
+                  ? `Verse ${detail.namoonaTafsir.surah}:${detail.namoonaTafsir.ayahFrom}`
+                  : `Verses ${detail.namoonaTafsir.surah}:${detail.namoonaTafsir.ayahFrom}–${detail.namoonaTafsir.ayahTo}`}
+              </Text>
+              <Text style={[styles.namoonaText, { color: theme.text }]}>
+                {detail.namoonaTafsir.text}
+              </Text>
+              <Text style={[styles.majmaAttribution, { color: theme.textSecondary }]}>
+                {NAMOONA_ATTRIBUTION}
+              </Text>
+            </View>
+          )}
+
+
           {/* Personal note & tags (stored on this device only) */}
           <NoteTagsEditor
             key={`${surahNumber}_${ayahNumber}`}
@@ -485,6 +524,25 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 4,
   },
+  namoonaHeadingUr: {
+    fontFamily: 'Amiri_700Bold',
+    fontSize: 20,
+  },
+  namoonaScholar: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 15,
+  },
+  namoonaText: {
+    // Urdu renders in the app's single Arabic-script face (Amiri — the
+    // same treatment as Urdu translation text: Amiri + RTL, no italics).
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 17,
+    lineHeight: 34,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    marginTop: 8,
+  },
+
   nav: {
     flexDirection: 'row',
     justifyContent: 'space-between',
