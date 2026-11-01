@@ -2,14 +2,16 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useState } from 'react';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAyahDetail, getAyahWords } from '../../../lib/queries';
 import WordByWord from '../../../components/WordByWord';
 import { Colors } from '../../../constants/colors';
 import { useTheme } from '../../../lib/theme';
 import NoteTagsEditor from '../../../components/NoteTagsEditor';
+import ListenButton from '../../../components/ListenButton';
+import { stopSpeech } from '../../../lib/speech';
 
 // Same honest labelling as the Today screen: the "Reflection" rows are
 // AI-written pending scholarly review, never presented as a scholarly quote.
@@ -97,6 +99,24 @@ export default function AyahDetailScreen() {
       cancelled = true;
     };
   }, [surahNumber, ayahNumber]);
+
+  // Listen-aloud (1.0.8): speech belongs to the ayah on screen — stop it
+  // when moving to another ayah, when the screen loses focus, and on
+  // unmount, so a translation or tafsir section never keeps reading over
+  // another screen.
+  useEffect(() => {
+    return () => {
+      stopSpeech();
+    };
+  }, [surahNumber, ayahNumber]);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        stopSpeech();
+      };
+    }, [])
+  );
 
   const toggleWbw = async () => {
     const next = !showWbw;
@@ -227,6 +247,18 @@ export default function AyahDetailScreen() {
                 {t.scholarName} · {t.languageCode}
                 {t.isDefault ? ' · default' : ''}
               </Text>
+              <View
+                style={[
+                  styles.listenRow,
+                  isRtlLang(t.languageCode) && styles.listenRowRtl,
+                ]}
+              >
+                <ListenButton
+                  sectionId={`ayah-${surahNumber}-${ayahNumber}-translation-${t.id}`}
+                  text={t.text}
+                  language={t.languageCode}
+                />
+              </View>
             </View>
           ))}
 
@@ -272,6 +304,13 @@ export default function AyahDetailScreen() {
               <View style={styles.majmaHeadingRow}>
                 <Text style={[styles.majmaHeadingAr, { color: theme.goldText }]}>التفسير</Text>
                 <Text style={[styles.tafsirLabel, { color: theme.textSecondary }]}>TAFSIR</Text>
+                <View style={styles.headingListen}>
+                  <ListenButton
+                    sectionId={`ayah-${surahNumber}-${ayahNumber}-tafsir-majma`}
+                    text={detail.majmaTafsir.text}
+                    language="ar"
+                  />
+                </View>
               </View>
               <Text style={[styles.majmaScholar, { color: theme.text }]}>
                 الطبرسي — مجمع البيان
@@ -306,6 +345,13 @@ export default function AyahDetailScreen() {
               <View style={styles.majmaHeadingRow}>
                 <Text style={[styles.namoonaHeadingUr, { color: theme.goldText }]}>اردو تفسیر</Text>
                 <Text style={[styles.tafsirLabel, { color: theme.textSecondary }]}>TAFSIR-E-NAMOONA</Text>
+                <View style={styles.headingListen}>
+                  <ListenButton
+                    sectionId={`ayah-${surahNumber}-${ayahNumber}-tafsir-namoona`}
+                    text={detail.namoonaTafsir.text}
+                    language="ur"
+                  />
+                </View>
               </View>
               <Text style={[styles.namoonaScholar, { color: theme.text }]}>
                 Makarem Shirazi — Tafsir-e-Namoona
@@ -454,6 +500,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   translationBlock: { marginBottom: 20 },
+  listenRow: { marginTop: 10, alignItems: 'flex-start' },
+  listenRowRtl: { alignItems: 'flex-end' },
+  headingListen: { marginLeft: 'auto' },
   translation: {
     fontFamily: 'Amiri_400Regular',
     fontSize: 16,
