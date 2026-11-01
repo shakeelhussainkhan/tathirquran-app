@@ -108,6 +108,21 @@ export default function AboutScreen() {
           <Text style={styles.email}>CC BY-NC-SA 4.0 — creativecommons.org</Text>
         </TouchableOpacity>
 
+        {/* Tafsir-e-Namoona credit — a condition of the permission granted
+            2026-11-01: the full attribution for the Urdu tafsir shown
+            with each verse, with a link to the source project. */}
+        <Text style={styles.creditText}>
+          Tafsir-e-Namoona by Ayatullah Naser Makarem Shirazi — Urdu
+          Translation by Safdar Husain Najafi. Urdu translation published by
+          Misbahul Quran Trust, Pakistan. Data provided by the
+          Tafsir-e-Namoona project, Fi Sabeelillah, for free non-commercial
+          use.
+        </Text>
+        <TouchableOpacity onPress={() => Linking.openURL('https://tafseerenamoona.net')}>
+          <Text style={styles.email}>Tafsir-e-Namoona — tafseerenamoona.net</Text>
+        </TouchableOpacity>
+
+
         <View style={styles.divider} />
 
         {/* Built by */}
