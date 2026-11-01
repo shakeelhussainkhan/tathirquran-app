@@ -103,6 +103,16 @@ export async function fetchLatestStoreVersion(): Promise<StoreUpdateInfo | null>
     ) {
       return null;
     }
+    // Defense in depth (pentest 2026-10-31): the store URL comes from the
+    // lookup response and is handed to Linking.openURL on tap. Only ever
+    // open an Apple store URL — anything else (a non-Apple host or a
+    // non-https scheme) is treated as no-update rather than opened.
+    if (
+      !first.trackViewUrl.startsWith('https://apps.apple.com/') &&
+      !first.trackViewUrl.startsWith('https://itunes.apple.com/')
+    ) {
+      return null;
+    }
     return { latestVersion: first.version, storeUrl: first.trackViewUrl };
   } catch {
     return null;
