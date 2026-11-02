@@ -606,12 +606,15 @@ export async function getAyahDetail(surahNumber: number, ayahNumber: number) {
 
   const { data: translationRows } = await supabase
     .from('ayah_translations')
-    .select('id, text, translations(scholar_name, language_code, is_default)')
+    .select('id, text, translations(translation_id, scholar_name, language_code, is_default)')
     .eq('ayah_id', ayah.ayah_id);
 
   const translations = ((translationRows as any[]) || [])
     .map((r) => ({
       id: r.id,
+      // The translations-table id (not the ayah_translations row id) —
+      // the streamed-narration asset names key on it (lib/narration.ts).
+      translationId: r.translations?.translation_id ?? null,
       text: r.text,
       scholarName: r.translations?.scholar_name ?? '',
       languageCode: r.translations?.language_code ?? '',
