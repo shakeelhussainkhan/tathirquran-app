@@ -858,6 +858,56 @@ export default function HomeScreen() {
           {translation?.translations?.scholar_name}
         </Text>
 
+        {/* Tafsir chips (1.0.8): jump straight to this verse's tafsir on
+            the ayah screen, with the matching language tab selected and
+            the tafsir area scrolled into view. */}
+        {ayah && (
+          <View style={styles.tafsirChipRow}>
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: '/ayah/[surah]/[ayah]',
+                  params: {
+                    surah: String(ayah.surah_number),
+                    ayah: String(ayah.ayah_number),
+                    tafsirLang: 'ar',
+                    focusTafsir: '1',
+                  },
+                } as any)
+              }
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Read the Arabic tafsir for this verse"
+              style={[styles.tafsirChip, { borderColor: theme.border }]}
+            >
+              <Text style={[styles.tafsirChipText, { color: theme.goldText }]}>
+                Arabic Tafsir
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: '/ayah/[surah]/[ayah]',
+                  params: {
+                    surah: String(ayah.surah_number),
+                    ayah: String(ayah.ayah_number),
+                    tafsirLang: 'ur',
+                    focusTafsir: '1',
+                  },
+                } as any)
+              }
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Read the Urdu tafsir for this verse"
+              style={[styles.tafsirChip, { borderColor: theme.border }]}
+            >
+              <Text style={[styles.tafsirChipText, { color: theme.goldText }]}>
+                Urdu Tafsir
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Previous / Next ayah (v1.0.6, Saira) */}
         <View style={styles.prevNextRow}>
           <TouchableOpacity onPress={handlePrevAyah} hitSlop={8} activeOpacity={0.7}>
@@ -1462,6 +1512,25 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  tafsirChipRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  tafsirChip: {
+    borderWidth: 0.5,
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+  },
+  tafsirChipText: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 11,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
   pillActive: { paddingVertical: 5, paddingHorizontal: 14, borderRadius: 2 },
   pillInactive: { borderWidth: 0.5, paddingVertical: 5, paddingHorizontal: 14, borderRadius: 2 },
   pillTextActive: { color: '#fff', fontSize: 11, letterSpacing: 1 },

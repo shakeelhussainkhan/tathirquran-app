@@ -125,8 +125,16 @@ export function stopSpeech(): void {
 /**
  * Speak `text` as section `sectionId` in `language` (app code: en/ur/ar/fa).
  * Any current speech is stopped first — only one section speaks at a time.
+ * `voiceIdentifier`, when given, is passed through as the explicit TTS
+ * voice (the narration fallback guard in ListenButton resolves a voice
+ * that actually matches the section's language before calling this).
  */
-export function speakSection(sectionId: string, text: string, language: string): void {
+export function speakSection(
+  sectionId: string,
+  text: string,
+  language: string,
+  voiceIdentifier?: string,
+): void {
   const chunks = splitIntoChunks(text);
   if (chunks.length === 0) return;
 
@@ -143,6 +151,7 @@ export function speakSection(sectionId: string, text: string, language: string):
     }
     Speech.speak(chunks[index], {
       language: locale,
+      ...(voiceIdentifier ? { voice: voiceIdentifier } : {}),
       // Matches the Today screen's existing listen-aloud rate.
       rate: 0.9,
       onDone: () => speakChunk(index + 1),

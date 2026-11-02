@@ -2,7 +2,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAyahDetail, getAyahWords } from '../../../lib/queries';
@@ -12,6 +12,7 @@ import { useTheme } from '../../../lib/theme';
 import NoteTagsEditor from '../../../components/NoteTagsEditor';
 import ListenButton from '../../../components/ListenButton';
 import { stopSpeech } from '../../../lib/speech';
+import { stopNarration } from '../../../lib/narration';
 
 // Same honest labelling as the Today screen: the "Reflection" rows are
 // AI-written pending scholarly review, never presented as a scholarly quote.
@@ -43,7 +44,12 @@ const isRtlLang = (code: string) => code === 'ar' || code === 'fa' || code === '
  */
 export default function AyahDetailScreen() {
   const theme = useTheme();
-  const params = useLocalSearchParams<{ surah: string; ayah: string }>();
+  const params = useLocalSearchParams<{
+    surah: string;
+    ayah: string;
+    tafsirLang?: string;
+    focusTafsir?: string;
+  }>();
   const surahNumber = parseInt(params.surah ?? '', 10);
   const ayahNumber = parseInt(params.ayah ?? '', 10);
 
@@ -56,12 +62,46 @@ export default function AyahDetailScreen() {
   const [words, setWords] = useState<any[]>([]);
   const [showWbw, setShowWbw] = useState(false);
   const [showTransliteration, setShowTransliteration] = useState(false);
+  // Tafsir language tab (1.0.8): 'ar' = Majma' al-Bayan, 'ur' = Namoona.
+  // Persisted in AsyncStorage ('tafsirLang') and restored on every ayah
+  // screen; a tafsirLang navigation param (daily-ayah chips) overrides
+  // and re-persists it.
+  const [tafsirLang, setTafsirLang] = useState<'ar' | 'ur'>('ur');
+  const scrollRef = useRef<ScrollView | null>(null);
+  const tafsirYRef = useRef(0);
+  const focusHandledRef = useRef(false);
 
   useEffect(() => {
     AsyncStorage.getItem('show_transliteration').then((v) => {
       setShowTransliteration(v === 'true');
     });
+    AsyncStorage.getItem('tafsirLang').then((v) => {
+      if (v === 'ar' || v === 'ur') setTafsirLang(v);
+    });
   }, []);
+
+  // Daily-ayah tafsir chips navigate here with a language param: adopt
+  // it as the tab (and persist it, like a manual tab tap).
+  useEffect(() => {
+    if (params.tafsirLang === 'ar' || params.tafsirLang === 'ur') {
+      setTafsirLang(params.tafsirLang);
+      void AsyncStorage.setItem('tafsirLang', params.tafsirLang);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.tafsirLang]);
+
+  // A focusTafsir navigation can land on an already-mounted ayah screen
+  // (deep link / chip tap for another verse): re-arm the focus scroll
+  // whenever the verse changes.
+  useEffect(() => {
+    focusHandledRef.current = false;
+    tafsirYRef.current = 0;
+  }, [surahNumber, ayahNumber]);
+
+  const chooseTafsirLang = (lang: 'ar' | 'ur') => {
+    setTafsirLang(lang);
+    void AsyncStorage.setItem('tafsirLang', lang);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -107,6 +147,7 @@ export default function AyahDetailScreen() {
   useEffect(() => {
     return () => {
       stopSpeech();
+      stopNarration();
     };
   }, [surahNumber, ayahNumber]);
 
@@ -114,9 +155,38 @@ export default function AyahDetailScreen() {
     useCallback(() => {
       return () => {
         stopSpeech();
+        stopNarration();
       };
     }, [])
   );
+
+  // focusTafsir (daily-ayah chips): once the detail has loaded, scroll
+  // the tafsir area into view (best-effort — the tab is already set by
+  // the tafsirLang param effect above).
+  useEffect(() => {
+    if (!params.focusTafsir || !detail || focusHandledRef.current) return;
+    // The tab row's onLayout can land after the detail renders (cold
+    // start / deep link), so retry briefly until its position is known
+    // instead of scrolling once on a fixed timer.
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts += 1;
+      if (tafsirYRef.current > 0) {
+        focusHandledRef.current = true;
+        scrollRef.current?.scrollTo({
+          y: Math.max(0, tafsirYRef.current - 16),
+          animated: true,
+        });
+        clearInterval(interval);
+      } else if (attempts >= 10) {
+        focusHandledRef.current = true;
+        scrollRef.current?.scrollToEnd({ animated: true });
+        clearInterval(interval);
+      }
+    }, 300);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail]);
 
   const toggleWbw = async () => {
     const next = !showWbw;
@@ -157,6 +227,22 @@ export default function AyahDetailScreen() {
     : `Quran ${surahNumber}:${ayahNumber}`;
   const ayahCount = surah?.ayah_count ?? 0;
 
+  // Tafsir tabs: only the selected language's tafsir renders. When this
+  // verse has just one of the two, that one shows regardless of the tab
+  // (and the tab row only offers languages that exist for this verse).
+  const hasMajma = !!detail?.majmaTafsir;
+  const hasNamoona = !!detail?.namoonaTafsir;
+  const effectiveTafsirLang: 'ar' | 'ur' =
+    tafsirLang === 'ar'
+      ? hasMajma
+        ? 'ar'
+        : 'ur'
+      : hasNamoona
+        ? 'ur'
+        : 'ar';
+  const showMajma = hasMajma && effectiveTafsirLang === 'ar';
+  const showNamoona = hasNamoona && effectiveTafsirLang === 'ur';
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]} edges={['top', 'bottom']}>
       <View style={[styles.goldBar, { backgroundColor: theme.bronze }]} />
@@ -181,7 +267,7 @@ export default function AyahDetailScreen() {
           </Text>
         </View>
       ) : (
-        <ScrollView contentInsetAdjustmentBehavior="never" contentContainerStyle={styles.body}>
+        <ScrollView ref={scrollRef} contentInsetAdjustmentBehavior="never" contentContainerStyle={styles.body}>
           <View style={styles.refRow}>
             <Text style={[styles.surahLabel, { color: theme.textSecondary }]}>
               {surah?.name_english}
@@ -257,6 +343,16 @@ export default function AyahDetailScreen() {
                   sectionId={`ayah-${surahNumber}-${ayahNumber}-translation-${t.id}`}
                   text={t.text}
                   language={t.languageCode}
+                  narration={
+                    typeof t.translationId === 'number' && detail.ayah?.ayah_id
+                      ? {
+                          type: 'translation',
+                          translationId: t.translationId,
+                          ayahId: detail.ayah.ayah_id,
+                          lang: t.languageCode,
+                        }
+                      : undefined
+                  }
                 />
               </View>
             </View>
@@ -292,6 +388,61 @@ export default function AyahDetailScreen() {
             </View>
           )}
 
+          {/* Tafsir language tabs (1.0.8): Arabic = Majma' al-Bayan,
+              Urdu = Tafsir-e-Namoona. Only tabs for tafsirs that exist
+              for THIS verse are shown; only the selected language's
+              section renders below. No English tab — there is no
+              English tafsir in the app. */}
+          {(hasMajma || hasNamoona) && (
+            <View
+              onLayout={(e) => {
+                tafsirYRef.current = e.nativeEvent.layout.y;
+              }}
+              style={styles.tafsirTabRow}
+            >
+              {hasMajma && (
+                <TouchableOpacity
+                  onPress={() => chooseTafsirLang('ar')}
+                  activeOpacity={0.7}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: effectiveTafsirLang === 'ar' }}
+                  style={[
+                    styles.tafsirTab,
+                    {
+                      borderColor: effectiveTafsirLang === 'ar' ? theme.gold : theme.border,
+                      backgroundColor:
+                        effectiveTafsirLang === 'ar' ? theme.gold + '2E' : 'transparent',
+                    },
+                  ]}
+                >
+                  <Text style={[styles.tafsirTabText, { color: theme.goldText }]}>
+                    العربية · Arabic
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {hasNamoona && (
+                <TouchableOpacity
+                  onPress={() => chooseTafsirLang('ur')}
+                  activeOpacity={0.7}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: effectiveTafsirLang === 'ur' }}
+                  style={[
+                    styles.tafsirTab,
+                    {
+                      borderColor: effectiveTafsirLang === 'ur' ? theme.gold : theme.border,
+                      backgroundColor:
+                        effectiveTafsirLang === 'ur' ? theme.gold + '2E' : 'transparent',
+                    },
+                  ]}
+                >
+                  <Text style={[styles.tafsirTabText, { color: theme.goldText }]}>
+                    اردو · Urdu
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
           {/* Majma' al-Bayan (al-Tabarsi) — Arabic tafsir via OpenITI,
               CC BY-NC-SA 4.0. The block whose verse range contains this
               ayah, with the range stated. Kept separate from the
@@ -299,7 +450,7 @@ export default function AyahDetailScreen() {
               the original-language scholarly commentary, so it shows
               regardless of the selected translation language. Renders
               only once the Majma' rows are loaded. */}
-          {detail.majmaTafsir && (
+          {showMajma && detail.majmaTafsir && (
             <View style={[styles.tafsirBlock, { borderLeftColor: theme.gold }]}>
               <View style={styles.majmaHeadingRow}>
                 <Text style={[styles.majmaHeadingAr, { color: theme.goldText }]}>التفسير</Text>
@@ -309,6 +460,14 @@ export default function AyahDetailScreen() {
                     sectionId={`ayah-${surahNumber}-${ayahNumber}-tafsir-majma`}
                     text={detail.majmaTafsir.text}
                     language="ar"
+                    narration={{
+                      type: 'tafsir',
+                      slug: 'majma',
+                      lang: 'ar',
+                      surah: detail.majmaTafsir.surah,
+                      start: detail.majmaTafsir.ayahFrom,
+                      end: detail.majmaTafsir.ayahTo,
+                    }}
                   />
                 </View>
               </View>
@@ -340,7 +499,7 @@ export default function AyahDetailScreen() {
               Namoona rows are loaded. The attribution line below is a
               condition of the permission and appears with the section
               every time it is shown. */}
-          {detail.namoonaTafsir && (
+          {showNamoona && detail.namoonaTafsir && (
             <View style={[styles.tafsirBlock, { borderLeftColor: theme.gold }]}>
               <View style={styles.majmaHeadingRow}>
                 <Text style={[styles.namoonaHeadingUr, { color: theme.goldText }]}>اردو تفسیر</Text>
@@ -350,6 +509,14 @@ export default function AyahDetailScreen() {
                     sectionId={`ayah-${surahNumber}-${ayahNumber}-tafsir-namoona`}
                     text={detail.namoonaTafsir.text}
                     language="ur"
+                    narration={{
+                      type: 'tafsir',
+                      slug: 'namoona',
+                      lang: 'ur',
+                      surah: detail.namoonaTafsir.surah,
+                      start: detail.namoonaTafsir.ayahFrom,
+                      end: detail.namoonaTafsir.ayahTo,
+                    }}
                   />
                 </View>
               </View>
@@ -502,7 +669,7 @@ const styles = StyleSheet.create({
   translationBlock: { marginBottom: 20 },
   listenRow: { marginTop: 10, alignItems: 'flex-start' },
   listenRowRtl: { alignItems: 'flex-end' },
-  headingListen: { marginLeft: 'auto' },
+  headingListen: { marginLeft: 'auto', flexShrink: 1 },
   translation: {
     fontFamily: 'Amiri_400Regular',
     fontSize: 16,
@@ -518,6 +685,23 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   tafsirSection: { marginTop: 8, marginBottom: 8 },
+  tafsirTabRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 14,
+  },
+  tafsirTab: {
+    borderWidth: 0.5,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  tafsirTabText: {
+    fontFamily: 'Amiri_400Regular',
+    fontSize: 12,
+    letterSpacing: 0.5,
+  },
   tafsirBlock: {
     borderLeftWidth: 2,
     paddingLeft: 14,

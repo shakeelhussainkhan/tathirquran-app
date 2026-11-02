@@ -30,6 +30,11 @@ import {
 import { getOfflineSyncStatus, syncOfflineData, type OfflineSyncStatus } from '../lib/offlineDb';
 import ReciterPicker from '../components/ReciterPicker';
 import {
+  getNarrationGender,
+  setNarrationGender,
+  type NarrationGender,
+} from '../lib/narration';
+import {
   DEFAULT_RECITER,
   clearDownloads,
   formatBytes,
@@ -74,6 +79,7 @@ export default function SettingsScreen() {
   const azanStatus = useAudioPlayerStatus(azanPlayer);
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system');
   const [reciter, setReciter] = useState<Reciter>(DEFAULT_RECITER);
+  const [narrationGender, setNarrationGenderState] = useState<NarrationGender>('m');
   const [downloadsSize, setDownloadsSize] = useState(0);
   const [clearingDownloads, setClearingDownloads] = useState(false);
   const [offlineStatus, setOfflineStatus] = useState<OfflineSyncStatus | null>(null);
@@ -108,8 +114,14 @@ export default function SettingsScreen() {
       setStreak(await getStreakState());
       setReciter(await getSelectedReciter());
       setDownloadsSize(await getDownloadsSizeBytes());
+      setNarrationGenderState(await getNarrationGender());
     })();
   }, []);
+
+  const handleNarrationGenderChange = async (next: NarrationGender) => {
+    setNarrationGenderState(next);
+    await setNarrationGender(next);
+  };
 
   const refreshOfflineStatus = useCallback(async () => {
     try {
@@ -521,6 +533,28 @@ export default function SettingsScreen() {
 
         <Text style={s.syncNote}>
           Downloaded ayahs play offline and are preferred over streaming. Audio is stored only on this device.
+        </Text>
+
+        {/* NARRATION */}
+        <Text style={s.sectionHeader}>NARRATION</Text>
+
+        <Text style={s.rowGroupLabel}>Narration voice</Text>
+        {([
+          { value: 'm', label: 'Male' },
+          { value: 'f', label: 'Female' },
+        ] as { value: NarrationGender; label: string }[]).map((option) => (
+          <TouchableOpacity
+            key={option.value}
+            style={s.row}
+            onPress={() => void handleNarrationGenderChange(option.value)}
+            activeOpacity={0.7}
+          >
+            <Text style={s.rowLabel}>{option.label}</Text>
+            {narrationGender === option.value && <Text style={s.checkmark}>✓</Text>}
+          </TouchableOpacity>
+        ))}
+        <Text style={s.syncNote}>
+          The voice used for streamed narration of tafsir, translations and quotes. Where no narration has been recorded yet, the app falls back to your device's voice for that language.
         </Text>
 
         {/* OFFLINE */}

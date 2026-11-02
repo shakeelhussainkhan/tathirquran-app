@@ -121,6 +121,7 @@ export default function NahjulBalaghaCard({ quote }: { quote: NahjulBalaghaQuote
           sectionId={`nahjul-quote-${quote.number}`}
           text={text}
           language={shownLang}
+          narration={{ type: 'quote', sayingId: quote.number, lang: shownLang }}
         />
       </View>
     </View>
