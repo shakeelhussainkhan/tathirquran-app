@@ -115,6 +115,17 @@ function setSpeaking(sectionId: string | null): void {
   emit();
 }
 
+// Listen-aloud speed multiplier (1.0.9): set by the ListenButton speed
+// chip from the shared playback-rate preference. Applied on top of the
+// base rate below, and re-read per chunk, so a change mid-section takes
+// effect from the next chunk.
+let speechRateMultiplier = 1;
+
+export function setSpeechRateMultiplier(multiplier: number): void {
+  speechRateMultiplier =
+    typeof multiplier === 'number' && multiplier > 0 ? multiplier : 1;
+}
+
 /** Stop any current speech and clear the speaking state. */
 export function stopSpeech(): void {
   generation += 1;
@@ -152,8 +163,9 @@ export function speakSection(
     Speech.speak(chunks[index], {
       language: locale,
       ...(voiceIdentifier ? { voice: voiceIdentifier } : {}),
-      // Matches the Today screen's existing listen-aloud rate.
-      rate: 0.9,
+      // Matches the Today screen's existing listen-aloud rate, scaled
+      // by the user's playback-speed preference (1.0.9).
+      rate: 0.9 * speechRateMultiplier,
       onDone: () => speakChunk(index + 1),
       onStopped: () => {
         if (gen === generation) setSpeaking(null);

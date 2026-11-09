@@ -9,25 +9,19 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../lib/theme';
-import {
-  checkForUpdate,
-  dismissUpdateForVersion,
-  type StoreUpdateInfo,
-} from '../lib/updateCheck';
+import { checkForUpdate, type StoreUpdateInfo } from '../lib/updateCheck';
 
 /**
  * "A new version is available" soft prompt.
  *
  * Mounted once in the root layout (app/_layout.tsx). On mount it asks
  * lib/updateCheck.ts whether a newer App Store version exists (iOS;
- * throttled to one lookup per 24h) and, if so, shows this modal once.
- * It is NEVER a forced update: the backdrop tap, the Android back
- * button (onRequestClose) and the "Later" button all dismiss it, and
- * dismissing silences that version for good — the prompt returns only
- * when a still-newer version ships. "Update" opens the App Store page
- * via Linking; it deliberately does NOT record a dismissal, so a user
- * who tapped Update but didn't complete it is reminded on a later
- * launch (subject to the same 24h throttle).
+ * network lookup throttled to once per 24h, decision served from the
+ * known-info cache). Since 1.0.9 the prompt returns on EVERY launch
+ * until the user actually updates: it is still NEVER a forced update —
+ * the backdrop tap, the Android back button (onRequestClose) and the
+ * "Later" button all dismiss it — but dismissing now closes it for
+ * that launch only. "Update" opens the App Store page via Linking.
  *
  * Styling follows the app's Champagne modal language (PrayerClock):
  * dimmed backdrop, centred card in the theme's card surface with a
@@ -51,8 +45,9 @@ export default function UpdatePrompt() {
 
   if (!update) return null;
 
+  // "Later" closes the prompt for this launch only (1.0.9): it returns
+  // on the next launch until the user actually updates.
   const later = () => {
-    void dismissUpdateForVersion(update.latestVersion);
     setUpdate(null);
   };
 

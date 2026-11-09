@@ -15,14 +15,18 @@ import {
   localGetScheduleAyahId,
   localGetMajmaTafsir,
   localGetNamoonaTafsir,
+  localGetTibyanTafsir,
   localGetSurahs,
   localGetTafsir,
   MAJMA_SCHOLAR,
   NAMOONA_SCHOLAR,
+  TIBYAN_SCHOLAR,
   type LocalJuzRange,
   type LocalMajmaTafsir,
   type LocalNamoonaTafsir,
+  type LocalTibyanTafsir,
 } from './offlineDb';
+import { STATIC_JUZ_RANGES } from './juzBoundaries';
 
 /**
  * All reads are local-first: they serve from the on-device SQLite store
@@ -117,7 +121,8 @@ export async function getDefaultTranslation(ayahId: number, languageCode: string
         .eq('translation_id', translation.translation_id)
         .single();
 
-      return ayahTranslation;
+      if (!ayahTranslation) return null;
+      return { ...ayahTranslation, translationId: translation.translation_id };
     },
   );
 }
@@ -269,6 +274,74 @@ export async function getNamoonaTafsirForAyah(
         .select('ayah_id')
         .eq('scholar', NAMOONA_SCHOLAR)
         .eq('language_code', 'ur')
+        .gt('ayah_id', anchor.ayah_id)
+        .order('ayah_id', { ascending: true })
+        .limit(1);
+      const nextId = (nextRows as any[] | null)?.[0]?.ayah_id;
+      if (typeof nextId === 'number') {
+        const nextCoord = await coordOf(nextId);
+        if (nextCoord && nextCoord.surah_number === surahNumber) {
+          ayahTo = nextCoord.ayah_number - 1;
+        }
+      }
+      return {
+        text: anchor.text ?? '',
+        sourceBook: anchor.source_book ?? null,
+        surah: surahNumber,
+        ayahFrom: anchorCoord.ayah_number,
+        ayahTo,
+      };
+    },
+  );
+}
+
+
+export type TibyanTafsir = LocalTibyanTafsir;
+
+/**
+ * Al-Tibyan (Shaykh al-Tusi) Arabic commentary covering one ayah
+ * (1.0.9) — the second Arabic tafsir, offered beside Majma' al-Bayan in
+ * the ayah screen's Arabic tab via a scholar selector. Rows are stored
+ * one per commentary block, anchored at the block's first ayah (see
+ * localGetTibyanTafsir in lib/offlineDb.ts). Returns null until the
+ * Tibyan rows are loaded into the tafsir table.
+ */
+export async function getTibyanTafsirForAyah(
+  ayahId: number,
+  surahNumber: number,
+  ayahCount: number,
+): Promise<TibyanTafsir | null> {
+  return localFirst(
+    () => localGetTibyanTafsir(ayahId, surahNumber, ayahCount),
+    async () => {
+      const { data: anchors } = await supabase
+        .from('tafsir')
+        .select('*')
+        .eq('scholar', TIBYAN_SCHOLAR)
+        .eq('language_code', 'ar')
+        .lte('ayah_id', ayahId)
+        .order('ayah_id', { ascending: false })
+        .limit(1);
+      const anchor = (anchors as any[] | null)?.[0];
+      if (!anchor) return null;
+      const coordOf = async (
+        id: number,
+      ): Promise<{ surah_number: number; ayah_number: number } | null> => {
+        const { data } = await supabase
+          .from('ayahs')
+          .select('surah_number, ayah_number')
+          .eq('ayah_id', id)
+          .single();
+        return (data as { surah_number: number; ayah_number: number } | null) ?? null;
+      };
+      const anchorCoord = await coordOf(anchor.ayah_id);
+      if (!anchorCoord || anchorCoord.surah_number !== surahNumber) return null;
+      let ayahTo = ayahCount > 0 ? ayahCount : anchorCoord.ayah_number;
+      const { data: nextRows } = await supabase
+        .from('tafsir')
+        .select('ayah_id')
+        .eq('scholar', TIBYAN_SCHOLAR)
+        .eq('language_code', 'ar')
         .gt('ayah_id', anchor.ayah_id)
         .order('ayah_id', { ascending: true })
         .limit(1);
@@ -638,7 +711,14 @@ export async function getAyahDetail(surahNumber: number, ayahNumber: number) {
     ayah.surahs?.ayah_count ?? 0,
   );
 
-  return { ayah, translations, tafsirEntries, majmaTafsir, namoonaTafsir };
+  // Al-Tibyan Arabic commentary for this ayah (null until loaded, 1.0.9).
+  const tibyanTafsir = await getTibyanTafsirForAyah(
+    ayah.ayah_id,
+    surahNumber,
+    ayah.surahs?.ayah_count ?? 0,
+  );
+
+  return { ayah, translations, tafsirEntries, majmaTafsir, namoonaTafsir, tibyanTafsir };
 }
 
 // ---------- Verse reader ranges (Mushaf / Juz / Khatmah portions) ----------
@@ -731,7 +811,7 @@ export type JuzRange = LocalJuzRange;
  * boundary list is hardcoded here.
  */
 export async function getJuzRanges(): Promise<JuzRange[]> {
-  return localFirst<JuzRange[]>(
+  const ranges = await localFirst<JuzRange[]>(
     () => localGetJuzRanges(),
     async () => {
       // Fallback only (the local store is the primary path): resolve each
@@ -771,4 +851,9 @@ export async function getJuzRanges(): Promise<JuzRange[]> {
       return ranges.sort((a, b) => a.juz - b.juz);
     },
   );
+  // Final fallback (1.0.9): the bundled canonical boundaries. The Juz
+  // index must never render empty just because the synced juz_number
+  // data is missing or incomplete — that was the 2026-11-07 bug.
+  if (!ranges || ranges.length !== 30) return STATIC_JUZ_RANGES;
+  return ranges;
 }

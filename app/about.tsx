@@ -108,6 +108,17 @@ export default function AboutScreen() {
           <Text style={styles.email}>CC BY-NC-SA 4.0 — creativecommons.org</Text>
         </TouchableOpacity>
 
+        {/* Al-Tibyan credit — the full CC BY-NC-SA 4.0 attribution for
+            the second Arabic tafsir (1.0.9). */}
+        <Text style={styles.creditText}>
+          Commentary: al-Tusi, Al-Tibyan al-Jami' li-'Ulum al-Qur'an, via
+          OpenITI (release 2025.1.9), text URI
+          0460ShaykhTusi.Tibyan.Tafsir04039-ara1 — licensed
+          CC BY-NC-SA 4.0. Changes: the text was segmented per verse-range
+          and edition page markers were removed; wording is otherwise
+          verbatim. This dataset is shared under CC BY-NC-SA 4.0.
+        </Text>
+
         {/* Tafsir-e-Namoona credit — a condition of the permission granted
             2026-11-01: the full attribution for the Urdu tafsir shown
             with each verse, with a link to the source project. */}

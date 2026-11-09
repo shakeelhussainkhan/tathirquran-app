@@ -358,6 +358,12 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         ))}
 
+        <Text style={s.syncNote}>
+          Chooses the translation shown under each verse, the Daily Ayah
+          translation and the verse in prayer reminders. The app's menus
+          stay in English.
+        </Text>
+
         {language === 'en' && (
           <>
             <Text style={s.rowGroupLabel}>Translation</Text>
@@ -566,7 +572,9 @@ export default function SettingsScreen() {
             {syncing
               ? 'Syncing…'
               : offlineStatus && offlineStatus.ayahCount > 0
-                ? '✓ Ready'
+                ? offlineStatus.juzCount >= 30
+                  ? '✓ Ready'
+                  : 'Needs re-sync'
                 : 'Not downloaded'}
           </Text>
         </View>

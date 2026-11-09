@@ -47,6 +47,8 @@ export interface OfflineSyncStatus {
   ayahCount: number;
   translationTextCount: number;
   scheduleCount: number;
+  /** Distinct juz covered by the local ayahs (30 when complete). */
+  juzCount: number;
   error?: string;
 }
 
@@ -403,12 +405,14 @@ export function syncOfflineData(
       const syncedAt = new Date().toISOString();
       await AsyncStorage.setItem(OFFLINE_LAST_SYNCED_KEY, syncedAt);
       lastSyncError = null;
+      const fresh = await getOfflineSyncStatus();
       return {
         state: 'ready',
         lastSyncedAt: syncedAt,
         ayahCount,
         translationTextCount,
         scheduleCount,
+        juzCount: fresh.juzCount,
       };
     } catch (e) {
       lastSyncError = e instanceof Error ? e.message : 'Offline sync failed.';
@@ -447,6 +451,7 @@ export async function getOfflineSyncStatus(): Promise<OfflineSyncStatus> {
       ayahCount: 0,
       translationTextCount: 0,
       scheduleCount: 0,
+      juzCount: 0,
       error: lastSyncError ?? undefined,
     };
   }
@@ -455,11 +460,13 @@ export async function getOfflineSyncStatus(): Promise<OfflineSyncStatus> {
       ayahs: number;
       texts: number;
       schedule: number;
+      juz: number;
     }>(
       `SELECT
          (SELECT COUNT(*) FROM ayahs) AS ayahs,
          (SELECT COUNT(*) FROM ayah_translations) AS texts,
-         (SELECT COUNT(*) FROM daily_schedule) AS schedule`,
+         (SELECT COUNT(*) FROM daily_schedule) AS schedule,
+         (SELECT COUNT(DISTINCT juz_number) FROM ayahs WHERE juz_number IS NOT NULL) AS juz`,
     );
     const ayahCount = counts?.ayahs ?? 0;
     return {
@@ -468,6 +475,7 @@ export async function getOfflineSyncStatus(): Promise<OfflineSyncStatus> {
       ayahCount,
       translationTextCount: counts?.texts ?? 0,
       scheduleCount: counts?.schedule ?? 0,
+      juzCount: counts?.juz ?? 0,
       error: lastSyncError ?? undefined,
     };
   } catch {
@@ -477,6 +485,7 @@ export async function getOfflineSyncStatus(): Promise<OfflineSyncStatus> {
       ayahCount: 0,
       translationTextCount: 0,
       scheduleCount: 0,
+      juzCount: 0,
     };
   }
 }
@@ -527,6 +536,7 @@ export async function localGetDefaultTranslation(
   if (!row) return null;
   return {
     text: row.text,
+    translationId: translation.translation_id as number,
     translations: {
       scholar_name: translation.scholar_name,
       attribution_text: translation.attribution_text,
@@ -634,6 +644,9 @@ export async function localGetMajmaTafsir(
   };
 }
 
+/** Scholar label of the Al-Tibyan rows, exactly as loaded (1.0.9). */
+export const TIBYAN_SCHOLAR = 'الطوسي — التبيان';
+
 /** Scholar label of the Tafsir-e-Namoona rows, exactly as loaded. */
 export const NAMOONA_SCHOLAR = 'Makarem Shirazi — Tafsir-e-Namoona';
 
@@ -674,6 +687,58 @@ export async function localGetNamoonaTafsir(
   const next = await db.getFirstAsync<{ ayah_id: number }>(
     "SELECT ayah_id FROM tafsir WHERE scholar = ? AND language_code = 'ur' AND ayah_id > ? ORDER BY ayah_id ASC LIMIT 1",
     [NAMOONA_SCHOLAR, anchor.ayah_id],
+  );
+  if (next && typeof next.ayah_id === 'number') {
+    const nextCoord = await db.getFirstAsync<{ surah_number: number; ayah_number: number }>(
+      'SELECT surah_number, ayah_number FROM ayahs WHERE ayah_id = ?',
+      [next.ayah_id],
+    );
+    if (nextCoord && nextCoord.surah_number === surahNumber) {
+      ayahTo = nextCoord.ayah_number - 1;
+    }
+  }
+  return {
+    text: typeof anchor.text === 'string' ? anchor.text : '',
+    sourceBook: typeof anchor.source_book === 'string' ? anchor.source_book : null,
+    surah: surahNumber,
+    ayahFrom: anchorCoord.ayah_number,
+    ayahTo,
+  };
+}
+
+
+export type LocalTibyanTafsir = LocalMajmaTafsir;
+
+/**
+ * Al-Tibyan (Shaykh al-Tusi) Arabic commentary covering one ayah
+ * (1.0.9). Stored exactly like Majma' al-Bayan (see
+ * localGetMajmaTafsir): ONE row per commentary block, anchored at the
+ * block's first ayah, blocks tiling every surah — the covering block is
+ * the anchored row with the greatest ayah_id <= the ayah's own, in the
+ * same surah. Returns null when no Tibyan rows are present.
+ */
+export async function localGetTibyanTafsir(
+  ayahId: number,
+  surahNumber: number,
+  ayahCount: number,
+): Promise<LocalTibyanTafsir | null> {
+  const db = await getOfflineDb();
+  if (!db) return null;
+  const anchors = await db.getAllAsync<Row>(
+    "SELECT * FROM tafsir WHERE scholar = ? AND language_code = 'ar' AND ayah_id <= ? ORDER BY ayah_id DESC LIMIT 1",
+    [TIBYAN_SCHOLAR, ayahId],
+  );
+  const anchor = anchors[0];
+  if (!anchor || typeof anchor.ayah_id !== 'number') return null;
+  const anchorCoord = await db.getFirstAsync<{ surah_number: number; ayah_number: number }>(
+    'SELECT surah_number, ayah_number FROM ayahs WHERE ayah_id = ?',
+    [anchor.ayah_id],
+  );
+  if (!anchorCoord || anchorCoord.surah_number !== surahNumber) return null;
+  let ayahTo = ayahCount > 0 ? ayahCount : anchorCoord.ayah_number;
+  const next = await db.getFirstAsync<{ ayah_id: number }>(
+    "SELECT ayah_id FROM tafsir WHERE scholar = ? AND language_code = 'ar' AND ayah_id > ? ORDER BY ayah_id ASC LIMIT 1",
+    [TIBYAN_SCHOLAR, anchor.ayah_id],
   );
   if (next && typeof next.ayah_id === 'number') {
     const nextCoord = await db.getFirstAsync<{ surah_number: number; ayah_number: number }>(

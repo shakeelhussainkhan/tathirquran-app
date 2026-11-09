@@ -1,14 +1,21 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Alert, Platform, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import * as Speech from 'expo-speech';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../lib/theme';
 import {
   getSpeakingSectionId,
+  setSpeechRateMultiplier,
   speakSection,
   stopSpeech,
   subscribeSpeech,
 } from '../lib/speech';
+import {
+  formatPlaybackRate,
+  getPlaybackRate,
+  nextPlaybackRate,
+  setPlaybackRate,
+} from '../lib/playbackRate';
 import {
   getNarrationState,
   isNarrationMissing,
@@ -17,6 +24,7 @@ import {
   pauseNarration,
   playNarration,
   resumeNarration,
+  applyNarrationPlaybackRate,
   stopNarration,
   subscribeNarration,
   type NarrationDescriptor,
@@ -117,6 +125,29 @@ export default function ListenButton({
     getNarrationState,
   );
   const [starting, setStarting] = useState(false);
+  const [rate, setRate] = useState(1);
+
+  // Playback speed (1.0.9): load the shared preference on mount and
+  // keep the device-TTS multiplier in step with it.
+  useEffect(() => {
+    let cancelled = false;
+    void getPlaybackRate().then((r) => {
+      if (cancelled) return;
+      setRate(r);
+      setSpeechRateMultiplier(r);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const cycleRate = () => {
+    const next = nextPlaybackRate(rate);
+    setRate(next);
+    void setPlaybackRate(next);
+    applyNarrationPlaybackRate(next);
+    setSpeechRateMultiplier(next);
+  };
 
   const isSpeaking = speakingId === sectionId;
   const isNarrating = narrationState.sectionId === sectionId;
@@ -209,6 +240,22 @@ export default function ListenButton({
         <Text style={[styles.position, { color: theme.textSecondary }]}>
           {formatTime(narrationState.position)} / {formatTime(narrationState.duration)}
         </Text>
+      ) : null}
+      {active ? (
+        <TouchableOpacity
+          onPress={cycleRate}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`Playback speed ${formatPlaybackRate(rate)}. Tap to change speed.`}
+          style={[
+            styles.chip,
+            { borderColor: theme.border, backgroundColor: 'transparent' },
+          ]}
+        >
+          <Text style={[styles.label, { color: theme.goldText }]}>
+            {formatPlaybackRate(rate)}
+          </Text>
+        </TouchableOpacity>
       ) : null}
       {isNarrating ? (
         <TouchableOpacity

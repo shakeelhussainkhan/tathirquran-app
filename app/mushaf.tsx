@@ -133,8 +133,8 @@ export default function MushafScreen() {
       ) : juzRanges.length === 0 ? (
         <View style={s.center}>
           <Text style={[s.emptyText, { color: theme.textSecondary }]}>
-            The Juz index is not on this device yet. Connect to the internet
-            once so the app can download the full Quran text, then try again.
+            The Juz index could not be loaded. Please check your
+            connection and try again.
           </Text>
         </View>
       ) : (
