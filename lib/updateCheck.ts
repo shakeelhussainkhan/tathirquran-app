@@ -25,14 +25,15 @@ import Constants from 'expo-constants';
  * same StoreUpdateInfo shape from whatever source is chosen then — the
  * comparison, throttle and dismissal logic below is platform-agnostic.
  *
- * Nag control (AsyncStorage, same persistence pattern as the quote
- * language in lib/nahjulBalagha.ts):
- * - at most one lookup per 24 hours (`update_check_last_at`); the
- *   attempt timestamp is written BEFORE the fetch, so a failed lookup
- *   also backs off instead of retrying on every launch;
- * - "Later" records the dismissed store version
- *   (`update_dismissed_version`); the prompt stays silent for that
- *   version and returns only when a still-newer version ships.
+ * Nag behaviour (changed 1.0.9, Shakeel's direction): the prompt
+ * returns on EVERY app launch until the user actually updates — a
+ * "Later" tap closes it only for that launch. To make that cheap, the
+ * last known store info is cached (`update_known_info`): a launch with
+ * a cached newer version prompts immediately, while the network lookup
+ * itself still runs at most once per 24 hours
+ * (`update_check_last_at`, written BEFORE the fetch so a failed lookup
+ * also backs off). The pre-1.0.9 dismissal key (`update_dismissed_version`)
+ * is no longer consulted.
  */
 
 const APP_STORE_ID = '6811745113';
@@ -43,6 +44,9 @@ export const UPDATE_CHECK_LAST_AT_KEY = 'update_check_last_at';
 
 /** AsyncStorage key: store version the user dismissed with "Later". */
 export const UPDATE_DISMISSED_VERSION_KEY = 'update_dismissed_version';
+
+/** AsyncStorage key: last known newer store version (JSON StoreUpdateInfo). */
+export const UPDATE_KNOWN_INFO_KEY = 'update_known_info';
 
 /** At most one App Store lookup per 24 hours. */
 export const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -119,9 +123,59 @@ export async function fetchLatestStoreVersion(): Promise<StoreUpdateInfo | null>
   }
 }
 
+async function readKnownInfo(): Promise<StoreUpdateInfo | null> {
+  try {
+    const raw = await AsyncStorage.getItem(UPDATE_KNOWN_INFO_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StoreUpdateInfo> | null;
+    if (
+      parsed &&
+      typeof parsed.latestVersion === 'string' &&
+      typeof parsed.storeUrl === 'string'
+    ) {
+      return { latestVersion: parsed.latestVersion, storeUrl: parsed.storeUrl };
+    }
+  } catch {
+    // Corrupt cache is simply ignored.
+  }
+  return null;
+}
+
 /**
- * The full launch decision: the store info when a newer, not-dismissed
- * version exists and the 24h throttle allows a check; otherwise null.
+ * One throttled network lookup; refreshes the known-info cache when the
+ * store reports a version newer than `current`. Returns the fresh info
+ * when newer, otherwise null. Never throws.
+ */
+async function refreshKnownInfo(current: string): Promise<StoreUpdateInfo | null> {
+  const lastAtRaw = await AsyncStorage.getItem(UPDATE_CHECK_LAST_AT_KEY);
+  const lastAt = lastAtRaw ? parseInt(lastAtRaw, 10) : NaN;
+  const now = Date.now();
+  if (Number.isFinite(lastAt) && now - lastAt < UPDATE_CHECK_INTERVAL_MS) {
+    return null;
+  }
+  // Record the attempt before fetching: failures back off for 24h too.
+  await AsyncStorage.setItem(UPDATE_CHECK_LAST_AT_KEY, String(now));
+
+  const info = await fetchLatestStoreVersion();
+  if (!info) return null;
+  if (!isNewerVersion(info.latestVersion, current)) {
+    // Store no longer ahead (e.g. the user updated): drop any stale cache.
+    await AsyncStorage.removeItem(UPDATE_KNOWN_INFO_KEY).catch(() => {});
+    return null;
+  }
+  await AsyncStorage.setItem(UPDATE_KNOWN_INFO_KEY, JSON.stringify(info)).catch(
+    () => {},
+  );
+  return info;
+}
+
+/**
+ * The full launch decision (1.0.9): prompt on EVERY launch while a newer
+ * store version is known to exist. A cached newer version returns
+ * immediately (and a throttled refresh runs in the background to keep
+ * the cache honest); with no cache, one throttled lookup decides.
+ * Stops on its own the moment the installed version catches up, because
+ * the comparison is always against the CURRENT installed version.
  * Never throws.
  */
 export async function checkForUpdate(): Promise<StoreUpdateInfo | null> {
@@ -129,32 +183,22 @@ export async function checkForUpdate(): Promise<StoreUpdateInfo | null> {
     const current = installedVersion();
     if (!current) return null;
 
-    const lastAtRaw = await AsyncStorage.getItem(UPDATE_CHECK_LAST_AT_KEY);
-    const lastAt = lastAtRaw ? parseInt(lastAtRaw, 10) : NaN;
-    const now = Date.now();
-    if (
-      Number.isFinite(lastAt) &&
-      now - lastAt < UPDATE_CHECK_INTERVAL_MS
-    ) {
-      return null;
+    const known = await readKnownInfo();
+    if (known && isNewerVersion(known.latestVersion, current)) {
+      void refreshKnownInfo(current); // background cache refresh
+      return known;
     }
-    // Record the attempt before fetching: failures back off for 24h too.
-    await AsyncStorage.setItem(UPDATE_CHECK_LAST_AT_KEY, String(now));
-
-    const info = await fetchLatestStoreVersion();
-    if (!info) return null;
-    if (!isNewerVersion(info.latestVersion, current)) return null;
-
-    const dismissed = await AsyncStorage.getItem(UPDATE_DISMISSED_VERSION_KEY);
-    if (dismissed === info.latestVersion) return null;
-
-    return info;
+    return await refreshKnownInfo(current);
   } catch {
     return null;
   }
 }
 
-/** Silence the prompt for one store version (the "Later" button). */
+/**
+ * Legacy pre-1.0.9 dismissal (no longer consulted by checkForUpdate —
+ * since 1.0.9 "Later" closes the prompt for that launch only). Kept so
+ * existing stored values and imports remain harmless.
+ */
 export async function dismissUpdateForVersion(version: string): Promise<void> {
   try {
     await AsyncStorage.setItem(UPDATE_DISMISSED_VERSION_KEY, version);

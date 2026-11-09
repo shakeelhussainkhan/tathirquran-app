@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { Directory, File, Paths } from 'expo-file-system';
 import { stopSpeech } from './speech';
+import { getPlaybackRate } from './playbackRate';
 
 /**
  * Streamed narration audio (1.0.8) — pre-generated MP3s hosted on the
@@ -41,8 +42,10 @@ export const NARRATION_GENDER_STORAGE_KEY = 'narrationGender';
 export type NarrationDescriptor =
   | {
       type: 'tafsir';
-      /** namoona = Urdu Tafsir-e-Namoona; majma = Arabic Majma' al-Bayan. */
-      slug: 'namoona' | 'majma';
+      /** namoona = Urdu Tafsir-e-Namoona; majma = Arabic Majma' al-Bayan;
+       *  tibyan = Arabic Al-Tibyan (assets generated after 1.0.9; until
+       *  they exist the Listen button falls back to guarded device TTS). */
+      slug: 'namoona' | 'majma' | 'tibyan';
       lang: 'ur' | 'ar';
       surah: number;
       /** First ayah of the tafsir block (inclusive). */
@@ -226,6 +229,20 @@ export function pauseNarration(): void {
   setState({ ...state, playing: false });
 }
 
+/**
+ * Apply a playback speed to the live narration player (used by the
+ * ListenButton speed chip so a change takes effect mid-playback, not
+ * only on the next narration). Best-effort.
+ */
+export function applyNarrationPlaybackRate(rate: number): void {
+  if (!player) return;
+  try {
+    player.setPlaybackRate(rate);
+  } catch {
+    // Best-effort.
+  }
+}
+
 export function resumeNarration(): void {
   if (!player || state.sectionId === null) return;
   try {
@@ -294,8 +311,16 @@ export async function playNarration(
   if (gen !== generation) return false;
 
   try {
-    await setAudioModeAsync({ playsInSilentMode: true });
+    // shouldPlayInBackground (with the expo-audio plugin's background
+    // modes in app.json) keeps narration playing after the screen locks
+    // — 1.0.9 fix: it previously stopped a few seconds after lock.
+    await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true });
     p.replace({ uri: localUri });
+    try {
+      p.setPlaybackRate(await getPlaybackRate());
+    } catch {
+      // Rate is best-effort; playback itself must not fail over it.
+    }
     p.play();
   } catch {
     markNarrationMissing(assetName);

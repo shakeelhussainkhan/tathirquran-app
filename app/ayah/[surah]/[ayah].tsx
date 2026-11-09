@@ -34,6 +34,16 @@ const MAJMA_ATTRIBUTION_EN =
 const NAMOONA_ATTRIBUTION =
   'Tafsir-e-Namoona by Ayatullah Naser Makarem Shirazi — Urdu Translation by Safdar Husain Najafi';
 
+// Al-Tibyan (al-Tusi) attribution — the CC BY-NC-SA 4.0 credit lines
+// shown with the Tibyan section (credit + licence + the changes made
+// to the source text), mirroring the Majma' lines above. Source:
+// OpenITI release 2025.1.9, primary version Tafsir04039-ara1
+// (altafsir.com text).
+const TIBYAN_ATTRIBUTION_AR =
+  'التفسير: الطوسي، التبيان الجامع لعلوم القرآن، عبر مكتبة OpenITI (إصدار 2025.1.9)، النصّ من altafsir.com. مرخّص بموجب CC BY-NC-SA 4.0 — جرى تقسيم النصّ على الآيات وحذف علامات صفحات الطبعة، والمتن بنصّه دون تغيير.';
+const TIBYAN_ATTRIBUTION_EN =
+  "Commentary: al-Tusi, Al-Tibyan al-Jami' li-'Ulum al-Qur'an, via OpenITI (release 2025.1.9), text URI 0460ShaykhTusi.Tibyan.Tafsir04039-ara1 — https://github.com/OpenITI/0475AH — licensed CC BY-NC-SA 4.0 (https://creativecommons.org/licenses/by-nc-sa/4.0/). Changes: the text was segmented per verse-range and edition page markers were removed; wording is otherwise verbatim. This dataset is shared under CC BY-NC-SA 4.0.";
+
 const isRtlLang = (code: string) => code === 'ar' || code === 'fa' || code === 'ur';
 
 /**
@@ -67,6 +77,10 @@ export default function AyahDetailScreen() {
   // screen; a tafsirLang navigation param (daily-ayah chips) overrides
   // and re-persists it.
   const [tafsirLang, setTafsirLang] = useState<'ar' | 'ur'>('ur');
+  // Arabic scholar selector (1.0.9): the Arabic tab now carries two
+  // tafsirs — Majma' al-Bayan (al-Tabarsi) and Al-Tibyan (al-Tusi).
+  // Persisted in AsyncStorage ('tafsirArabicScholar') like the tab.
+  const [arabicScholar, setArabicScholar] = useState<'majma' | 'tibyan'>('majma');
   const scrollRef = useRef<ScrollView | null>(null);
   const tafsirYRef = useRef(0);
   const focusHandledRef = useRef(false);
@@ -77,6 +91,9 @@ export default function AyahDetailScreen() {
     });
     AsyncStorage.getItem('tafsirLang').then((v) => {
       if (v === 'ar' || v === 'ur') setTafsirLang(v);
+    });
+    AsyncStorage.getItem('tafsirArabicScholar').then((v) => {
+      if (v === 'majma' || v === 'tibyan') setArabicScholar(v);
     });
   }, []);
 
@@ -101,6 +118,11 @@ export default function AyahDetailScreen() {
   const chooseTafsirLang = (lang: 'ar' | 'ur') => {
     setTafsirLang(lang);
     void AsyncStorage.setItem('tafsirLang', lang);
+  };
+
+  const chooseArabicScholar = (scholar: 'majma' | 'tibyan') => {
+    setArabicScholar(scholar);
+    void AsyncStorage.setItem('tafsirArabicScholar', scholar);
   };
 
   useEffect(() => {
@@ -231,16 +253,31 @@ export default function AyahDetailScreen() {
   // verse has just one of the two, that one shows regardless of the tab
   // (and the tab row only offers languages that exist for this verse).
   const hasMajma = !!detail?.majmaTafsir;
+  const hasTibyan = !!detail?.tibyanTafsir;
+  const hasArabic = hasMajma || hasTibyan;
   const hasNamoona = !!detail?.namoonaTafsir;
   const effectiveTafsirLang: 'ar' | 'ur' =
     tafsirLang === 'ar'
-      ? hasMajma
+      ? hasArabic
         ? 'ar'
         : 'ur'
       : hasNamoona
         ? 'ur'
         : 'ar';
-  const showMajma = hasMajma && effectiveTafsirLang === 'ar';
+  // Within the Arabic tab, the chosen scholar — falling back to
+  // whichever Arabic tafsir this verse actually has.
+  const effectiveArabicScholar: 'majma' | 'tibyan' =
+    arabicScholar === 'tibyan'
+      ? hasTibyan
+        ? 'tibyan'
+        : 'majma'
+      : hasMajma
+        ? 'majma'
+        : 'tibyan';
+  const showMajma =
+    hasMajma && effectiveTafsirLang === 'ar' && effectiveArabicScholar === 'majma';
+  const showTibyan =
+    hasTibyan && effectiveTafsirLang === 'ar' && effectiveArabicScholar === 'tibyan';
   const showNamoona = hasNamoona && effectiveTafsirLang === 'ur';
 
   return (
@@ -393,14 +430,14 @@ export default function AyahDetailScreen() {
               for THIS verse are shown; only the selected language's
               section renders below. No English tab — there is no
               English tafsir in the app. */}
-          {(hasMajma || hasNamoona) && (
+          {(hasArabic || hasNamoona) && (
             <View
               onLayout={(e) => {
                 tafsirYRef.current = e.nativeEvent.layout.y;
               }}
               style={styles.tafsirTabRow}
             >
-              {hasMajma && (
+              {hasArabic && (
                 <TouchableOpacity
                   onPress={() => chooseTafsirLang('ar')}
                   activeOpacity={0.7}
@@ -440,6 +477,94 @@ export default function AyahDetailScreen() {
                   </Text>
                 </TouchableOpacity>
               )}
+            </View>
+          )}
+
+          {/* Arabic scholar selector (1.0.9): shown only when BOTH
+              Arabic tafsirs cover this verse and the Arabic tab is the
+              effective one. */}
+          {effectiveTafsirLang === 'ar' && hasMajma && hasTibyan && (
+            <View style={styles.tafsirTabRow}>
+              <TouchableOpacity
+                onPress={() => chooseArabicScholar('majma')}
+                activeOpacity={0.7}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: effectiveArabicScholar === 'majma' }}
+                style={[
+                  styles.tafsirTab,
+                  {
+                    borderColor: effectiveArabicScholar === 'majma' ? theme.gold : theme.border,
+                    backgroundColor:
+                      effectiveArabicScholar === 'majma' ? theme.gold + '2E' : 'transparent',
+                  },
+                ]}
+              >
+                <Text style={[styles.tafsirTabText, { color: theme.goldText }]}>
+                  مجمع البيان · Majma' al-Bayan
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => chooseArabicScholar('tibyan')}
+                activeOpacity={0.7}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: effectiveArabicScholar === 'tibyan' }}
+                style={[
+                  styles.tafsirTab,
+                  {
+                    borderColor: effectiveArabicScholar === 'tibyan' ? theme.gold : theme.border,
+                    backgroundColor:
+                      effectiveArabicScholar === 'tibyan' ? theme.gold + '2E' : 'transparent',
+                  },
+                ]}
+              >
+                <Text style={[styles.tafsirTabText, { color: theme.goldText }]}>
+                  التبيان · Al-Tibyan
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Al-Tibyan (al-Tusi) — Arabic tafsir via OpenITI,
+              CC BY-NC-SA 4.0. The block whose verse range contains this
+              ayah, with the range stated — same block model as Majma'. */}
+          {showTibyan && detail.tibyanTafsir && (
+            <View style={[styles.tafsirBlock, { borderLeftColor: theme.gold }]}>
+              <View style={styles.majmaHeadingRow}>
+                <Text style={[styles.majmaHeadingAr, { color: theme.goldText }]}>التفسير</Text>
+                <Text style={[styles.tafsirLabel, { color: theme.textSecondary }]}>TAFSIR</Text>
+                <View style={styles.headingListen}>
+                  <ListenButton
+                    sectionId={`ayah-${surahNumber}-${ayahNumber}-tafsir-tibyan`}
+                    text={detail.tibyanTafsir.text}
+                    language="ar"
+                    narration={{
+                      type: 'tafsir',
+                      slug: 'tibyan',
+                      lang: 'ar',
+                      surah: detail.tibyanTafsir.surah,
+                      start: detail.tibyanTafsir.ayahFrom,
+                      end: detail.tibyanTafsir.ayahTo,
+                    }}
+                  />
+                </View>
+              </View>
+              <Text style={[styles.majmaScholar, { color: theme.text }]}>
+                الطوسي — التبيان
+              </Text>
+              <Text style={[styles.scholar, { color: theme.textSecondary }]}>
+                {detail.tibyanTafsir.ayahFrom === detail.tibyanTafsir.ayahTo
+                  ? `Verse ${detail.tibyanTafsir.surah}:${detail.tibyanTafsir.ayahFrom}`
+                  : `Verses ${detail.tibyanTafsir.surah}:${detail.tibyanTafsir.ayahFrom}–${detail.tibyanTafsir.ayahTo}`}
+              </Text>
+              <Text style={[styles.majmaText, { color: theme.text }]}>
+                {detail.tibyanTafsir.text}
+              </Text>
+              <Text style={[styles.majmaAttributionAr, { color: theme.textSecondary }]}>
+                {TIBYAN_ATTRIBUTION_AR}
+              </Text>
+              <Text style={[styles.majmaAttribution, { color: theme.textSecondary }]}>
+                {TIBYAN_ATTRIBUTION_EN}
+              </Text>
             </View>
           )}
 

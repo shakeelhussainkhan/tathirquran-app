@@ -5,7 +5,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
-import { getAyahRange, getRangeTranslation } from '../lib/queries';
+import {
+  getAyahRange,
+  getRangeTranslation,
+  getMajmaTafsirForAyah,
+  getNamoonaTafsirForAyah,
+  getTibyanTafsirForAyah,
+  type MajmaTafsir,
+  type NamoonaTafsir,
+  type TibyanTafsir,
+} from '../lib/queries';
+import { SURAH_AYAH_COUNTS } from '../lib/khatmah';
+import ListenButton from './ListenButton';
 import {
   getSelectedReciter,
   resolvePlaybackUri,
@@ -92,6 +103,57 @@ export default function VerseReader({
   const [unavailable, setUnavailable] = useState(false);
   const [reciter, setReciter] = useState<Reciter>(DEFAULT_RECITER);
   const [playingId, setPlayingId] = useState<number | null>(null);
+
+  // Tafsir-from-browse (1.0.9): a per-ayah panel, loaded lazily on first
+  // open, that lets the reader LISTEN to the verse's tafsir without
+  // leaving the browse view (previously tafsir playback existed only on
+  // the single-ayah screen). One panel open at a time; results cached
+  // per ayah for the life of this reader.
+  const [tafsirOpenFor, setTafsirOpenFor] = useState<number | null>(null);
+  const [tafsirCache, setTafsirCache] = useState<
+    Record<
+      number,
+      {
+        majma: MajmaTafsir | null;
+        namoona: NamoonaTafsir | null;
+        tibyan: TibyanTafsir | null;
+      }
+    >
+  >({});
+  const [tafsirLoadingFor, setTafsirLoadingFor] = useState<number | null>(null);
+
+  const toggleTafsir = useCallback(
+    async (ayah: ReaderAyah) => {
+      if (tafsirOpenFor === ayah.ayah_id) {
+        setTafsirOpenFor(null);
+        return;
+      }
+      setTafsirOpenFor(ayah.ayah_id);
+      if (tafsirCache[ayah.ayah_id]) return;
+      setTafsirLoadingFor(ayah.ayah_id);
+      try {
+        const count = SURAH_AYAH_COUNTS[ayah.surah_number - 1] ?? 0;
+        const [majma, namoona, tibyan] = await Promise.all([
+          getMajmaTafsirForAyah(ayah.ayah_id, ayah.surah_number, count).catch(
+            () => null,
+          ),
+          getNamoonaTafsirForAyah(ayah.ayah_id, ayah.surah_number, count).catch(
+            () => null,
+          ),
+          getTibyanTafsirForAyah(ayah.ayah_id, ayah.surah_number, count).catch(
+            () => null,
+          ),
+        ]);
+        setTafsirCache((prev) => ({
+          ...prev,
+          [ayah.ayah_id]: { majma, namoona, tibyan },
+        }));
+      } finally {
+        setTafsirLoadingFor((cur) => (cur === ayah.ayah_id ? null : cur));
+      }
+    },
+    [tafsirOpenFor, tafsirCache],
+  );
 
   const player = useAudioPlayer(null);
   const playerStatus = useAudioPlayerStatus(player);
@@ -241,7 +303,7 @@ export default function VerseReader({
           player.play();
           return true;
         }
-        await setAudioModeAsync({ playsInSilentMode: true });
+        await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true });
         player.replace({ uri });
         loadedAudioUri.current = uri;
         setPlayingId(ayah.ayah_id);
@@ -445,6 +507,19 @@ export default function VerseReader({
               {isPlayingThis ? '⏸' : '▶'}
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => void toggleTafsir(ayah)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={
+              tafsirOpenFor === ayah.ayah_id
+                ? 'Hide tafsir listening options'
+                : 'Listen to the tafsir for this verse'
+            }
+          >
+            <Text style={[s.tafsirChip, { color: theme.goldText }]}>
+              {tafsirOpenFor === ayah.ayah_id ? 'Tafsir ▴' : 'Tafsir ▾'}
+            </Text>
+          </TouchableOpacity>
         </View>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -465,6 +540,85 @@ export default function VerseReader({
             </Text>
           ) : null}
         </TouchableOpacity>
+        {tafsirOpenFor === ayah.ayah_id ? (
+          <View style={[s.tafsirPanel, { borderTopColor: theme.border }]}>
+            {tafsirLoadingFor === ayah.ayah_id &&
+            !tafsirCache[ayah.ayah_id] ? (
+              <ActivityIndicator color={Colors.bronze} size="small" />
+            ) : (
+              <>
+                {tafsirCache[ayah.ayah_id]?.namoona ? (
+                  <View style={s.tafsirRow}>
+                    <Text style={[s.tafsirRowLabel, { color: theme.textSecondary }]}>
+                      TAFSIR-E-NAMOONA · URDU
+                    </Text>
+                    <ListenButton
+                      sectionId={`reader-${ayah.ayah_id}-tafsir-namoona`}
+                      text={tafsirCache[ayah.ayah_id]!.namoona!.text}
+                      language="ur"
+                      narration={{
+                        type: 'tafsir',
+                        slug: 'namoona',
+                        lang: 'ur',
+                        surah: tafsirCache[ayah.ayah_id]!.namoona!.surah,
+                        start: tafsirCache[ayah.ayah_id]!.namoona!.ayahFrom,
+                        end: tafsirCache[ayah.ayah_id]!.namoona!.ayahTo,
+                      }}
+                    />
+                  </View>
+                ) : null}
+                {tafsirCache[ayah.ayah_id]?.majma ? (
+                  <View style={s.tafsirRow}>
+                    <Text style={[s.tafsirRowLabel, { color: theme.textSecondary }]}>
+                      MAJMA' AL-BAYAN · ARABIC
+                    </Text>
+                    <ListenButton
+                      sectionId={`reader-${ayah.ayah_id}-tafsir-majma`}
+                      text={tafsirCache[ayah.ayah_id]!.majma!.text}
+                      language="ar"
+                      narration={{
+                        type: 'tafsir',
+                        slug: 'majma',
+                        lang: 'ar',
+                        surah: tafsirCache[ayah.ayah_id]!.majma!.surah,
+                        start: tafsirCache[ayah.ayah_id]!.majma!.ayahFrom,
+                        end: tafsirCache[ayah.ayah_id]!.majma!.ayahTo,
+                      }}
+                    />
+                  </View>
+                ) : null}
+                {tafsirCache[ayah.ayah_id]?.tibyan ? (
+                  <View style={s.tafsirRow}>
+                    <Text style={[s.tafsirRowLabel, { color: theme.textSecondary }]}>
+                      AL-TIBYAN · ARABIC
+                    </Text>
+                    <ListenButton
+                      sectionId={`reader-${ayah.ayah_id}-tafsir-tibyan`}
+                      text={tafsirCache[ayah.ayah_id]!.tibyan!.text}
+                      language="ar"
+                      narration={{
+                        type: 'tafsir',
+                        slug: 'tibyan',
+                        lang: 'ar',
+                        surah: tafsirCache[ayah.ayah_id]!.tibyan!.surah,
+                        start: tafsirCache[ayah.ayah_id]!.tibyan!.ayahFrom,
+                        end: tafsirCache[ayah.ayah_id]!.tibyan!.ayahTo,
+                      }}
+                    />
+                  </View>
+                ) : null}
+                {tafsirCache[ayah.ayah_id] &&
+                !tafsirCache[ayah.ayah_id].namoona &&
+                !tafsirCache[ayah.ayah_id].majma &&
+                !tafsirCache[ayah.ayah_id].tibyan ? (
+                  <Text style={[s.tafsirRowLabel, { color: theme.textSecondary }]}>
+                    No tafsir is available for this verse yet.
+                  </Text>
+                ) : null}
+              </>
+            )}
+          </View>
+        ) : null}
       </View>
     );
   };
@@ -706,6 +860,31 @@ function makeStyles(theme: ReturnType<typeof useTheme>) {
       letterSpacing: 1.5,
     },
     playBtn: { fontSize: 15, paddingHorizontal: 4 },
+    tafsirChip: {
+      fontFamily: 'Amiri_400Regular',
+      fontSize: 11,
+      letterSpacing: 1.5,
+      textTransform: 'uppercase',
+      paddingHorizontal: 4,
+    },
+    tafsirPanel: {
+      borderTopWidth: 0.5,
+      marginTop: 10,
+      paddingTop: 10,
+      gap: 10,
+    },
+    tafsirRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    tafsirRowLabel: {
+      fontFamily: 'Amiri_400Regular',
+      fontSize: 10,
+      letterSpacing: 1.5,
+    },
     arabic: {
       fontFamily: 'Amiri_700Bold',
       fontSize: 26,

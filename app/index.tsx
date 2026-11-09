@@ -41,6 +41,7 @@ import { useTheme } from '../lib/theme';
 import { calculatePrayerTimes, formatTime } from '../lib/prayerTimes';
 import { getTodayDevotionals, isThursdayEvening, type TodayDevotionals } from '../lib/devotionals';
 import DevotionalCard from '../components/DevotionalCard';
+import ListenButton from '../components/ListenButton';
 import { getTodayQuote } from '../lib/nahjulBalagha';
 import NahjulBalaghaCard from '../components/NahjulBalaghaCard';
 import {
@@ -425,7 +426,14 @@ export default function HomeScreen() {
         detail.translations[0];
       setTranslation(
         picked
-          ? { text: picked.text, translations: { scholar_name: picked.scholarName } }
+          ? {
+              text: picked.text,
+              translationId:
+                typeof picked.translationId === 'number'
+                  ? picked.translationId
+                  : undefined,
+              translations: { scholar_name: picked.scholarName },
+            }
           : null,
       );
       setTafsirEntries(detail.tafsirEntries ?? []);
@@ -589,7 +597,7 @@ export default function HomeScreen() {
     setIsSpeaking(false);
     try {
       setAudioLoading(true);
-      await setAudioModeAsync({ playsInSilentMode: true });
+      await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true });
       player.replace({ uri: ayahAudioUrl() });
       loopRef.current = { active: true, target: loopCount, done: 0 };
       setLoopPlaysDone(0);
@@ -706,7 +714,7 @@ export default function HomeScreen() {
         return;
       }
       setAudioLoading(true);
-      await setAudioModeAsync({ playsInSilentMode: true });
+      await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true });
       player.replace({ uri });
       loadedAudioUri.current = uri;
       player.play();
@@ -857,6 +865,30 @@ export default function HomeScreen() {
         <Text style={[styles.scholar, { color: theme.bronze }]}>
           {translation?.translations?.scholar_name}
         </Text>
+
+        {/* Translation listen (1.0.9): hear this verse's translation in
+            the selected language — streamed narration when the asset
+            exists, guarded device voice otherwise (ListenButton's
+            hybrid). The Arabic Audio action above stays recitation-only. */}
+        {ayah && translation?.text ? (
+          <View style={styles.translationListenRow}>
+            <ListenButton
+              sectionId={`daily-ayah-${ayah.ayah_id}-translation`}
+              text={translation.text}
+              language={selectedLang}
+              narration={
+                typeof translation.translationId === 'number'
+                  ? {
+                      type: 'translation',
+                      translationId: translation.translationId,
+                      ayahId: ayah.ayah_id,
+                      lang: selectedLang,
+                    }
+                  : undefined
+              }
+            />
+          </View>
+        ) : null}
 
         {/* Tafsir chips (1.0.8): jump straight to this verse's tafsir on
             the ayah screen, with the matching language tab selected and
@@ -1512,6 +1544,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  translationListenRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
   tafsirChipRow: {
     flexDirection: 'row',
     justifyContent: 'center',
