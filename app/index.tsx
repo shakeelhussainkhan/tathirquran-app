@@ -129,6 +129,10 @@ export default function HomeScreen() {
   const player = useAudioPlayer(null);
   const playerStatus = useAudioPlayerStatus(player);
   const currentAyahId = useRef<number | null>(null);
+  // The last 'selected_language' value seen in storage. Settings
+  // writes that key; this ref lets the focus check below react to
+  // a Settings change without reverting a chip pick on this screen.
+  const lastStoredLang = useRef<string>('en');
   // URI currently loaded in the player. Playback only "resumes" when the
   // desired URI (reciter + ayah + local-vs-remote) is exactly this one —
   // otherwise switching reciter would keep playing the previous voice.
@@ -182,6 +186,7 @@ export default function HomeScreen() {
       const savedLang = await AsyncStorage.getItem('selected_language');
       const lang = savedLang || 'en';
       setSelectedLang(lang);
+      lastStoredLang.current = lang;
 
       try {
         const [todayAyah, langs] = await Promise.all([
@@ -495,6 +500,28 @@ export default function HomeScreen() {
       setTranslation(trans);
     }
   };
+
+  // A language change made in Settings applies on return. Home
+  // reads 'selected_language' only at mount and stays mounted
+  // under Settings, so without this the Daily Ayah kept the old
+  // language until an app restart (reported by Shahid Hussain,
+  // 2026-11-09). lastStoredLang tracks the stored value only, so
+  // a language picked from the chips on this screen (which does
+  // not write storage) is never reverted by this check.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const stored = (await AsyncStorage.getItem('selected_language')) || 'en';
+        if (cancelled) return;
+        if (stored !== lastStoredLang.current) {
+          lastStoredLang.current = stored;
+          if (stored !== selectedLang) void handleLangChange(stored);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [selectedLang, ayah]),
+  );
 
   const toggleSection = (scholar: string) => {
     setOpenSections((prev) => ({ ...prev, [scholar]: !prev[scholar] }));
