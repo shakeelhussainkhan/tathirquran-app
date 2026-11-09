@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Modal, Pressable, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, Modal, Pressable, TouchableOpacity, StyleSheet, Switch, Alert } from 'react-native';
 import Svg, {
   Circle, Line, Polygon, Text as SvgText, Defs, G,
   RadialGradient, LinearGradient, Stop, Ellipse,
@@ -7,6 +7,13 @@ import Svg, {
 import { Ionicons } from '@expo/vector-icons';
 import type { Theme } from '../lib/theme';
 import { formatTime } from '../lib/prayerTimes';
+import {
+  ensureCoordsInteractive,
+  getAzanAlertsEnabled,
+  refreshPrayerAlerts,
+  setAzanAlertsEnabled,
+} from '../lib/prayerAlerts';
+import { requestNotificationPermission } from '../lib/notifications';
 
 /**
  * The premium prayer clock (v1.0.6 design round, Saira via Shakeel):
@@ -152,6 +159,48 @@ export default function PrayerTimesModal({
   onQibla: () => void;
 }) {
   const [now, setNow] = useState(() => new Date());
+  const [azanOn, setAzanOn] = useState(false);
+
+  // Azan alerts live in Settings; this mirrors the same switch
+  // here, where people actually look for it (requested by
+  // Shahid Hussain, 2026-11-09 — he never found the Settings row).
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    getAzanAlertsEnabled()
+      .then((v) => { if (!cancelled) setAzanOn(v); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [visible]);
+
+  const toggleAzan = async (val: boolean) => {
+    if (val) {
+      setAzanOn(true);
+      const granted = await requestNotificationPermission();
+      if (!granted) {
+        setAzanOn(false);
+        Alert.alert(
+          'Notifications are off',
+          'TathirQuran needs notification permission to show the morning verse and prayer-time alerts. You can allow it in your device Settings.'
+        );
+        return;
+      }
+      const coords = await ensureCoordsInteractive();
+      if (!coords) {
+        setAzanOn(false);
+        Alert.alert(
+          'Location needed',
+          'Prayer times are calculated from your location. Please allow location access so Fajr and the prayer times can be scheduled.'
+        );
+        return;
+      }
+      await setAzanAlertsEnabled(true);
+    } else {
+      setAzanOn(false);
+      await setAzanAlertsEnabled(false);
+    }
+    await refreshPrayerAlerts();
+  };
 
   // The dial is live while the pop-out is open (quartz-step seconds).
   useEffect(() => {
@@ -205,6 +254,19 @@ export default function PrayerTimesModal({
                     <Text style={[styles.gridTime, { color: theme.text }]}>{formatTime(e.time)}</Text>
                   </View>
                 ))}
+              </View>
+              <View style={[styles.azanRow, { borderTopColor: theme.border }]}>
+                <View style={styles.azanTextWrap}>
+                  <Text style={[styles.azanLabel, { color: theme.text }]}>Azan alerts</Text>
+                  <Text style={[styles.azanHint, { color: theme.textSecondary }]}>
+                    Sound the azan at each prayer time
+                  </Text>
+                </View>
+                <Switch
+                  value={azanOn}
+                  onValueChange={toggleAzan}
+                  accessibilityLabel="Azan alerts at prayer times"
+                />
               </View>
               <TouchableOpacity
                 style={[styles.qiblaRow, { borderTopColor: theme.border }]}
@@ -273,6 +335,18 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   gridTime: { fontSize: 12.5, fontWeight: '600', marginTop: 2 },
+  azanRow: {
+    borderTopWidth: 0.5,
+    marginTop: 4,
+    paddingTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  azanTextWrap: { flex: 1 },
+  azanLabel: { fontSize: 13, fontWeight: '700' },
+  azanHint: { fontSize: 11, marginTop: 2 },
   qiblaRow: {
     borderTopWidth: 0.5,
     marginTop: 4,
