@@ -63,9 +63,21 @@ function formatTime(seconds: number): string {
 
 function showVoiceNotInstalledAlert(language: string): void {
   const name = LANGUAGE_NAMES[language] ?? language;
+  // Apple ships no Urdu speech voice at all (verified 2026-11-13 against
+  // Apple's published voice lists and a user's device): on iOS there is
+  // nothing for an Urdu listener to install, so never send them into
+  // Settings. The recorded narration is the only route for Urdu on iOS,
+  // and it plays automatically once the file for the section exists.
+  if (language === 'ur' && Platform.OS === 'ios') {
+    Alert.alert(
+      'Narration coming soon',
+      'The recorded Urdu narration for this section is still being prepared. Once it is ready, Listen will play it automatically — there is nothing you need to install.',
+    );
+    return;
+  }
   const steps =
     Platform.OS === 'ios'
-      ? `To hear this read aloud, install the ${name} voice: Settings → Accessibility → Spoken Content → Voices → ${name} → download a voice.`
+      ? `To hear this read aloud, install the ${name} voice: Settings → Accessibility → Read & Speak → Voices → ${name} → download a voice. (On older iOS versions this section is called Spoken Content.)`
       : `To hear this read aloud, install the ${name} voice: Settings → General management → Text-to-speech output → Preferred engine settings → Install voice data → ${name} → download a voice.`;
   Alert.alert('Voice not installed', steps);
 }
