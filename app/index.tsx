@@ -937,6 +937,50 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
+        {/* Verse actions (v1.0.6: the floating rail is abolished — only
+            Audio, Share and Reciter remain. 1.0.10, Shahid round 4:
+            moved up under the translation, beside its Listen button,
+            matching the Mushaf view whose Play all sits at the top). */}
+        <View style={styles.actionRow}>
+          <View style={styles.actionItem}>
+            <TouchableOpacity
+              style={[styles.actionCircle, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
+              onPress={toggleAudio}
+              activeOpacity={0.7}
+              accessibilityLabel={player.playing ? 'Pause recitation' : 'Listen to this verse'}
+            >
+              {audioLoading ? (
+                <ActivityIndicator size="small" color={theme.primary} />
+              ) : (
+                <Ionicons name={player.playing ? 'pause' : 'play'} size={21} color={theme.primary} />
+              )}
+            </TouchableOpacity>
+            <Text style={[styles.actionLabel, { color: theme.textSecondary }]}>Audio</Text>
+          </View>
+          <View style={styles.actionItem}>
+            <TouchableOpacity
+              style={[styles.actionCircle, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
+              onPress={handleShare}
+              activeOpacity={0.7}
+              accessibilityLabel="Share this verse"
+            >
+              <Ionicons name="share-outline" size={20} color={theme.primary} />
+            </TouchableOpacity>
+            <Text style={[styles.actionLabel, { color: theme.textSecondary }]}>Share</Text>
+          </View>
+          <View style={styles.actionItem}>
+            <TouchableOpacity
+              style={[styles.actionCircle, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
+              onPress={() => setReciterModalOpen(true)}
+              activeOpacity={0.7}
+              accessibilityLabel="Choose reciter"
+            >
+              <Ionicons name="mic-outline" size={20} color={theme.primary} />
+            </TouchableOpacity>
+            <Text style={[styles.actionLabel, { color: theme.textSecondary }]}>Reciter</Text>
+          </View>
+        </View>
+
         {/* Tafsir chips (1.0.8): jump straight to this verse's tafsir on
             the ayah screen, with the matching language tab selected and
             the tafsir area scrolled into view. */}
@@ -1002,48 +1046,6 @@ export default function HomeScreen() {
           <TouchableOpacity onPress={handleNextAyah} hitSlop={8} activeOpacity={0.7}>
             <Text style={[styles.prevNextText, { color: theme.primary }]}>Next ›</Text>
           </TouchableOpacity>
-        </View>
-
-        {/* Verse actions (v1.0.6: the floating rail is abolished — only
-            Audio, Share and Reciter remain, below the verse). */}
-        <View style={styles.actionRow}>
-          <View style={styles.actionItem}>
-            <TouchableOpacity
-              style={[styles.actionCircle, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
-              onPress={toggleAudio}
-              activeOpacity={0.7}
-              accessibilityLabel={player.playing ? 'Pause recitation' : 'Listen to this verse'}
-            >
-              {audioLoading ? (
-                <ActivityIndicator size="small" color={theme.primary} />
-              ) : (
-                <Ionicons name={player.playing ? 'pause' : 'play'} size={21} color={theme.primary} />
-              )}
-            </TouchableOpacity>
-            <Text style={[styles.actionLabel, { color: theme.textSecondary }]}>Audio</Text>
-          </View>
-          <View style={styles.actionItem}>
-            <TouchableOpacity
-              style={[styles.actionCircle, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
-              onPress={handleShare}
-              activeOpacity={0.7}
-              accessibilityLabel="Share this verse"
-            >
-              <Ionicons name="share-outline" size={20} color={theme.primary} />
-            </TouchableOpacity>
-            <Text style={[styles.actionLabel, { color: theme.textSecondary }]}>Share</Text>
-          </View>
-          <View style={styles.actionItem}>
-            <TouchableOpacity
-              style={[styles.actionCircle, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
-              onPress={() => setReciterModalOpen(true)}
-              activeOpacity={0.7}
-              accessibilityLabel="Choose reciter"
-            >
-              <Ionicons name="mic-outline" size={20} color={theme.primary} />
-            </TouchableOpacity>
-            <Text style={[styles.actionLabel, { color: theme.textSecondary }]}>Reciter</Text>
-          </View>
         </View>
 
         {/* Language pills */}
