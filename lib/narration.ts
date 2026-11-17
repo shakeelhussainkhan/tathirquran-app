@@ -6,7 +6,10 @@ import { getPlaybackRate } from './playbackRate';
 
 /**
  * Streamed narration audio (1.0.8) — pre-generated MP3s hosted on the
- * tathirquran-audio GitHub repo's v1 release, played through expo-audio
+ * tathirquran-audio GitHub repo's releases, played through expo-audio.
+ * GitHub caps one release at 1,000 assets: v1 filled with tafsir files
+ * (2026-11-13), so translation and quote assets live in v2 and later
+ * libraries. Playback tries each library in NARRATION_BASE_URLS order.
  * (the same library + audio-session conventions as the recitation
  * player in components/VerseReader.tsx: setAudioModeAsync with
  * playsInSilentMode before playback).
@@ -34,6 +37,12 @@ import { getPlaybackRate } from './playbackRate';
 
 export const NARRATION_BASE_URL =
   'https://github.com/shakeelhussainkhan/tathirquran-audio/releases/download/v1/';
+
+/** All narration asset libraries, tried in order (see header note). */
+export const NARRATION_BASE_URLS: string[] = [
+  NARRATION_BASE_URL,
+  'https://github.com/shakeelhussainkhan/tathirquran-audio/releases/download/v2/',
+];
 
 export type NarrationGender = 'm' | 'f';
 
@@ -86,8 +95,8 @@ export function narrationAssetName(
   }
 }
 
-export function narrationUrl(assetName: string): string {
-  return `${NARRATION_BASE_URL}${assetName}`;
+export function narrationUrl(assetName: string, baseIndex = 0): string {
+  return `${NARRATION_BASE_URLS[baseIndex]}${assetName}`;
 }
 
 // ── Narration voice gender preference ───────────────────────────────
@@ -290,18 +299,34 @@ export async function playNarration(
     if (file.exists && file.size > 0) {
       localUri = file.uri;
     } else {
-      const downloaded = await File.downloadFileAsync(narrationUrl(assetName), file, {
-        idempotent: true,
-      });
-      if (!downloaded.exists || downloaded.size === 0) {
+      // Try each asset library in order; only a miss in ALL of them
+      // marks the asset missing for this session.
+      let downloadedUri: string | null = null;
+      for (let base = 0; base < NARRATION_BASE_URLS.length && !downloadedUri; base++) {
         try {
-          if (downloaded.exists) downloaded.delete();
+          const downloaded = await File.downloadFileAsync(
+            narrationUrl(assetName, base),
+            file,
+            { idempotent: true },
+          );
+          if (downloaded.exists && downloaded.size > 0) {
+            downloadedUri = downloaded.uri;
+          }
         } catch {
-          // Best-effort cleanup only.
+          // Not in this library — try the next one.
         }
-        throw new Error('Narration download produced an empty file');
+        if (!downloadedUri && file.exists) {
+          try {
+            file.delete();
+          } catch {
+            // Best-effort cleanup only.
+          }
+        }
       }
-      localUri = downloaded.uri;
+      if (!downloadedUri) {
+        throw new Error('Narration asset not found in any library');
+      }
+      localUri = downloadedUri;
     }
   } catch {
     markNarrationMissing(assetName);
