@@ -10,6 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.fivesllc.tathirquran",
+      "appStoreUrl": "https://apps.apple.com/app/tathirquran/id6811745113",
       "buildNumber": "18",
       "infoPlist": {
         "NSUserNotificationsUsageDescription": "TathirQuran sends you a daily Quran verse reminder each morning.",
@@ -20,6 +21,7 @@
     },
     "android": {
       "package": "com.fivesllc.tathirquran",
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.fivesllc.tathirquran",
       "versionCode": 19,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

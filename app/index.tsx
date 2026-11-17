@@ -37,6 +37,7 @@ import {
 import KhatmahCard from '../components/KhatmahCard';
 import { Colors } from '../constants/colors';
 import { gregorianToHijri } from '../lib/utils';
+import { recordUsageDay, maybeRequestReview, shouldShowShareCard, dismissShareCard, shareApp } from '../lib/engagement';
 import { useTheme } from '../lib/theme';
 import { calculatePrayerTimes, formatTime } from '../lib/prayerTimes';
 import { getTodayDevotionals, isThursdayEvening, type TodayDevotionals } from '../lib/devotionals';
@@ -148,6 +149,7 @@ export default function HomeScreen() {
   // Repeat-audio loop (uses the same recitation player as LISTEN)
   const LOOP_COUNTS = [1, 3, 5, 10];
   const [loopCount, setLoopCount] = useState(3);
+  const [showShareCard, setShowShareCard] = useState(false);
   const [loopActive, setLoopActive] = useState(false);
   const [loopPlaysDone, setLoopPlaysDone] = useState(0);
   const loopRef = useRef<{ active: boolean; target: number; done: number }>({ active: false, target: 0, done: 0 });
@@ -155,6 +157,24 @@ export default function HomeScreen() {
   // Stop TTS on unmount
   useEffect(() => {
     return () => { Speech.stop(); };
+  }, []);
+
+  // Engagement (1.0.10): count distinct days the app is opened. From
+  // the 7th day, ask once per version for a store review via the
+  // system prompt; from the 5th day, show a one-time share card. The
+  // two never appear in the same session, and every step is a silent
+  // no-op on error (see lib/engagement.ts).
+  useEffect(() => {
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const days = await recordUsageDay();
+      if (cancelled || days === 0) return;
+      const asked = await maybeRequestReview(days);
+      if (!cancelled && !asked) {
+        setShowShareCard(await shouldShowShareCard(days));
+      }
+    }, 1500);
+    return () => { cancelled = true; clearTimeout(t); };
   }, []);
 
   useEffect(() => {
@@ -1310,6 +1330,26 @@ export default function HomeScreen() {
             </Text>
           </TouchableOpacity>
         </>)}
+        {showShareCard && (
+          <View style={[styles.circleCard, { borderColor: theme.border, backgroundColor: theme.bgCard }]}>
+            <Text style={[styles.circleKicker, { color: theme.goldText }]}>SHARE THE KHAYR</Text>
+            <Text style={[styles.circleText, { color: theme.textSecondary }]}>
+              If TathirQuran has benefited you, share it with someone you love — it may become a sadaqah jariyah for you.
+            </Text>
+            <TouchableOpacity
+              onPress={async () => { await shareApp(); await dismissShareCard(); setShowShareCard(false); }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.circleLink, { color: theme.bronze }]}>SHARE TATHIRQURAN →</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={async () => { await dismissShareCard(); setShowShareCard(false); }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.shareDismiss, { color: theme.textSecondary }]}>Not now</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         <PrayerModule
           theme={theme}
           bearing={bearing}
@@ -1735,6 +1775,7 @@ const styles = StyleSheet.create({
   circleKicker: { fontSize: 10, letterSpacing: 2, fontWeight: '700' },
   circleText: { fontSize: 12.5, lineHeight: 18, textAlign: 'center' },
   circleLink: { fontSize: 11, letterSpacing: 1.5, fontWeight: '700' },
+  shareDismiss: { fontSize: 11.5, marginTop: 2 },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(13,10,4,0.45)',
