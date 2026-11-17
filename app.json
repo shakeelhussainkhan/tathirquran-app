@@ -2,7 +2,7 @@
   "expo": {
     "name": "TathirQuran",
     "slug": "tathirquran",
-    "version": "1.0.9",
+    "version": "1.0.10",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -11,7 +11,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.fivesllc.tathirquran",
       "appStoreUrl": "https://apps.apple.com/app/tathirquran/id6811745113",
-      "buildNumber": "18",
+      "buildNumber": "19",
       "infoPlist": {
         "NSUserNotificationsUsageDescription": "TathirQuran sends you a daily Quran verse reminder each morning.",
         "NSMicrophoneUsageDescription": "This app does not use the microphone.",
@@ -22,7 +22,7 @@
     "android": {
       "package": "com.fivesllc.tathirquran",
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.fivesllc.tathirquran",
-      "versionCode": 19,
+      "versionCode": 20,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#faf5e9"
