@@ -27,6 +27,7 @@ import {
   setVerseReminderFrequency,
   type VerseReminderFrequency,
 } from '../lib/prayerAlerts';
+import { shareApp } from '../lib/engagement';
 import { getOfflineSyncStatus, syncOfflineData, type OfflineSyncStatus } from '../lib/offlineDb';
 import ReciterPicker from '../components/ReciterPicker';
 import {
@@ -742,6 +743,11 @@ export default function SettingsScreen() {
         >
           <Text style={s.rowLabel}>Rate this app</Text>
           <Text style={s.rowLink}>App Store ↗</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={s.row} onPress={shareApp}>
+          <Text style={s.rowLabel}>Share TathirQuran</Text>
+          <Text style={s.rowLink}>Tell a friend ↗</Text>
         </TouchableOpacity>
 
         {/* Credits */}
