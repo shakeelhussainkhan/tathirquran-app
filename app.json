@@ -22,7 +22,7 @@
     "android": {
       "package": "com.fivesllc.tathirquran",
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.fivesllc.tathirquran",
-      "versionCode": 20,
+      "versionCode": 21,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#faf5e9"
@@ -37,6 +37,7 @@
       "expo-router",
       "expo-font",
       "./plugins/withTathirQuranWidget",
+      "./plugins/withPortraitFeatureOptional",
       "expo-asset",
       [
         "expo-splash-screen",
